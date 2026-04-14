@@ -92,7 +92,7 @@ export function Dashboard() {
           Bienvenido de nuevo, {user?.name.split(' ')[0]}
         </h1>
         <p style={{ color: 'var(--text-sec)' }}>
-          {user?.role === 'admin' 
+          {(user?.roleId === 1 || user?.roleId === 2) 
             ? `Vista consolidada - ${selectedBranch.name}` 
             : `${selectedBranch.name}`}
         </p>

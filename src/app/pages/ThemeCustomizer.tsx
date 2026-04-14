@@ -78,7 +78,7 @@ export function ThemeCustomizer() {
 
   // Redirigir si no es admin
   useEffect(() => {
-    if (user?.role !== 'admin') {
+    if (user && user.roleId !== 1 && user.roleId !== 2) {
       navigate('/settings');
     }
   }, [user, navigate]);

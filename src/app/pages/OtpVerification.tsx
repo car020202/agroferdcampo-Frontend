@@ -77,6 +77,11 @@ export function OtpVerification() {
       if (data.accessToken) {
         localStorage.setItem("agro-token", data.accessToken);
         
+        // Guardar el identificador del dispositivo si se solicitó recordar
+        if (data.deviceId) {
+          localStorage.setItem("agro-device-id", data.deviceId);
+        }
+        
         // Obtener datos del usuario tras verificación exitosa
         const backendUser = await apiRequest<any>("/auth/me", {
           headers: { Authorization: `Bearer ${data.accessToken}` }

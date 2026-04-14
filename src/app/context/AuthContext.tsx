@@ -53,9 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<LoginResponse> => {
     try {
-      console.log('Intentando login para:', email);
+      const deviceId = localStorage.getItem('agro-device-id');
+      console.log('Intentando login para:', email, deviceId ? '(con dispositivo recordado)' : '');
+      
       const data = await apiRequest<LoginResponse>('/auth/login', {
         method: 'POST',
+        headers: deviceId ? { 'X-Device-Id': deviceId } : {},
         body: JSON.stringify({ email, password }),
       });
 

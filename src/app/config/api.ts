@@ -12,10 +12,15 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  const headers = {
+  const token = localStorage.getItem('agro-token');
+  const headers: any = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   try {
     const response = await fetch(url, {

@@ -40,7 +40,7 @@ export function Settings() {
   const { currentColors, isCustomThemeActive } = useTheme();
   const navigate = useNavigate();
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.roleId === 1 || user?.roleId === 2;
 
   return (
     <div>
