@@ -18,15 +18,24 @@ export function Login() {
     setError("");
     setLoading(true);
 
-    const success = await login(email, password);
+    try {
+      const response = await login(email, password);
 
-    if (success) {
-      navigate("/dashboard");
-    } else {
-      setError("Credenciales incorrectas. Intenta de nuevo.");
+      if (response.status === "MFA_REQUIRED") {
+        // Redirigir a verificación de OTP pasando el email como estado
+        navigate("/verify-otp", { state: { email } });
+      } else if (response.status === "PASSWORD_CHANGE_REQUIRED") {
+        // Manejar cambio de contraseña obligatorio
+        setError("Debes cambiar tu contraseña temporal.");
+        // Aquí se podría redirigir a una página de set-initial-password
+      } else if (response.accessToken) {
+        navigate("/dashboard");
+      }
+    } catch (err: any) {
+      setError(err.message || "Credenciales incorrectas. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -155,24 +164,7 @@ export function Login() {
           </div>
         </form>
 
-        {/* Demo Credentials */}
-        <div
-          className="mt-6 p-4 rounded-lg text-sm"
-          style={{
-            backgroundColor: "var(--bg)",
-            color: "var(--text-sec)",
-          }}
-        >
-          <p
-            className="font-semibold mb-2"
-            style={{ color: "var(--text-main)" }}
-          >
-            Credenciales de prueba:
-          </p>
-          <p>• Admin: admin@agroferdcampo.com / admin123</p>
-          {/*<p>• Supervisor: supervisor@agroferdcampo.com / super123</p>*/}
-          {/*<p>• Cajero: cajero@agroferdcampo.com / cajero123</p>*/}
-        </div>
+        {/* Secciones de ayuda o información adicional pueden ir aquí */}
       </div>
     </div>
   );

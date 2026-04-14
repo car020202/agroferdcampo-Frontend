@@ -1,49 +1,45 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { apiRequest } from '../config/api';
 
 interface User {
   id: string;
-  name: string;
+  name: string; // Cambiado de fullName para compatibilidad
   email: string;
-  role: 'admin' | 'supervisor' | 'cashier' | 'warehouse';
-  branch: string;
+  role: string;
+  roleId: number;
+  phone?: string;
+  dui?: string;
+  branch?: string; // Restaurado
+}
+
+interface BackendUser {
+  id: number;
+  email: string;
+  fullName: string;
+  role: string;
+  roleId: number;
+  phone?: string;
+  dui?: string;
+}
+
+interface LoginResponse {
+  accessToken?: string;
+  status?: 'PASSWORD_CHANGE_REQUIRED' | 'MFA_REQUIRED';
+  message?: string;
+  token?: string; // Token temporal para cambio de password
+  deviceId?: string;
+  trustedUntil?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<LoginResponse>;
   logout: () => void;
   isAuthenticated: boolean;
+  setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Mock users para demo
-const MOCK_USERS: Array<User & { password: string }> = [
-  {
-    id: '1',
-    name: 'Carlos Yanez',
-    email: 'admin@agroferdcampo.com',
-    password: 'admin123',
-    role: 'admin',
-    branch: 'Todas'
-  },
-  {
-    id: '2',
-    name: 'María González',
-    email: 'supervisor@agroferdcampo.com',
-    password: 'super123',
-    role: 'supervisor',
-    branch: 'Sucursal 1'
-  },
-  {
-    id: '3',
-    name: 'Juan Pérez',
-    email: 'cajero@agroferdcampo.com',
-    password: 'cajero123',
-    role: 'cashier',
-    branch: 'Sucursal 1'
-  }
-];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -51,26 +47,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    // Simular delay de red
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const foundUser = MOCK_USERS.find(
-      u => u.email === email && u.password === password
-    );
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem('agro-token');
+  });
 
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('agro-user', JSON.stringify(userWithoutPassword));
-      return true;
+  const login = async (email: string, password: string): Promise<LoginResponse> => {
+    try {
+      console.log('Intentando login para:', email);
+      const data = await apiRequest<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+
+      console.log('Respuesta del servidor:', data);
+
+      if (data.accessToken) {
+        setToken(data.accessToken);
+        localStorage.setItem('agro-token', data.accessToken);
+        
+        // Obtener datos del usuario desde /auth/me
+        const backendUser = await apiRequest<BackendUser>('/auth/me', {
+          headers: { Authorization: `Bearer ${data.accessToken}` }
+        });
+        
+        const mappedUser: User = {
+          id: backendUser.id.toString(),
+          name: backendUser.fullName,
+          email: backendUser.email,
+          role: backendUser.role,
+          roleId: backendUser.roleId,
+          phone: backendUser.phone,
+          dui: backendUser.dui,
+          branch: 'Todas'
+        };
+        
+        setUser(mappedUser);
+        localStorage.setItem('agro-user', JSON.stringify(mappedUser));
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error('Error detallado de login:', error.message);
+      throw new Error(error.message || 'Error al iniciar sesión');
     }
-    return false;
   };
 
   const logout = () => {
     setUser(null);
+    setToken(null);
     localStorage.removeItem('agro-user');
+    localStorage.removeItem('agro-token');
   };
 
   return (
@@ -78,7 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user, 
       login, 
       logout, 
-      isAuthenticated: !!user 
+      isAuthenticated: !!user,
+      setUser
     }}>
       {children}
     </AuthContext.Provider>

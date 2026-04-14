@@ -3,6 +3,7 @@ import { Layout } from './components/layout/Layout';
 import { Login } from './pages/Login';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
+import { OtpVerification } from './pages/OtpVerification';
 import { Dashboard } from './pages/Dashboard';
 import { POS } from './pages/POS';
 import { Inventory } from './pages/Inventory';
@@ -25,6 +26,10 @@ export const router = createBrowserRouter([
   {
     path: '/reset-password',
     element: <ResetPassword />
+  },
+  {
+    path: '/verify-otp',
+    element: <OtpVerification />
   },
   {
     path: '/',

@@ -1,22 +1,32 @@
 import { useState, FormEvent } from "react";
 import logo from "../../assets/logo.png";
 import { Link } from "react-router";
-import { Mail, ArrowLeft, Send, CheckCircle } from "lucide-react";
+import { Mail, ArrowLeft, Send, CheckCircle, AlertCircle } from "lucide-react";
+import { apiRequest } from "../config/api";
 
 export function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  const [error, setError] = useState("");
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
     
-    // Simulación de envío de correo
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await apiRequest("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
       setSubmitted(true);
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message || "No se pudo procesar la solicitud. Verifica el correo.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -52,6 +62,15 @@ export function ForgotPassword() {
 
         {!submitted ? (
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div
+                className="flex items-center gap-2 p-3 rounded-lg"
+                style={{ backgroundColor: "#fee2e2", color: "#991b1b" }}
+              >
+                <AlertCircle size={20} />
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
             {/* Email Input */}
             <div>
               <label

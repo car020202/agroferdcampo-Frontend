@@ -1,21 +1,29 @@
 import { useState, FormEvent } from "react";
 import logo from "../../assets/logo.png";
-import { Link, useNavigate } from "react-router";
-import { Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
+import { apiRequest } from "../config/api";
 
 export function ResetPassword() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
   
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!token) {
+      setError("Token de recuperación no válido o ausente.");
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden");
@@ -29,16 +37,22 @@ export function ResetPassword() {
 
     setLoading(true);
     
-    // Simulación de actualización de contraseña
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await apiRequest("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token, newPassword: password }),
+      });
       setSubmitted(true);
       
       // Redirigir al login después de 3 segundos
       setTimeout(() => {
         navigate("/");
       }, 3000);
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message || "No se pudo restablecer la contraseña. El link puede haber expirado.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,10 +90,11 @@ export function ResetPassword() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div
-                className="p-3 rounded-lg text-sm text-center"
+                className="flex items-center gap-2 p-3 rounded-lg text-sm"
                 style={{ backgroundColor: "#fee2e2", color: "#991b1b" }}
               >
-                {error}
+                <AlertCircle size={20} />
+                <span>{error}</span>
               </div>
             )}
 
