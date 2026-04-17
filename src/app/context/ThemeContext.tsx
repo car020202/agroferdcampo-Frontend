@@ -6,6 +6,8 @@ import {
   applyColorsToDOM,
   clearCustomColorsFromDOM,
 } from '../utils/colorUtils';
+import { themeApiService } from '../services/theme.service';
+import { useAuth } from './AuthContext';
 
 type Theme = 'light' | 'dark';
 
@@ -61,6 +63,8 @@ function loadJSON<T>(key: string, fallback: T): T {
   }
 }
 
+const LS_MIGRATED = 'agro-theme-migrated';
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   // --- Estado base ---
   const [theme, setTheme] = useState<Theme>(() => {
@@ -81,6 +85,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     () => loadJSON<SavedTheme[]>(LS_SAVED_THEMES, [])
   );
 
+  const { user } = useAuth();
+  const isAdmin = user?.roleId === 1 || user?.roleId === 2;
+
   const [isPreviewActive, setIsPreviewActive] = useState(false);
   const [previewBackup, setPreviewBackup] = useState<ColorPalette | null>(null);
 
@@ -99,6 +106,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const currentColors = getActiveColors(theme);
 
   // --- Efectos ---
+
+  // 1. Aplicar cambios al DOM y guardar en localStorage (Caché)
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');
@@ -107,7 +116,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
     localStorage.setItem(LS_THEME, theme);
 
-    // Aplicar colores personalizados si están activos
     if (isCustomThemeActive) {
       const colors = getActiveColors(theme);
       applyColorsToDOM(colors);
@@ -116,24 +124,133 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [theme, isCustomThemeActive, getActiveColors]);
 
+  // 2. Sincronizar con el Servidor al iniciar
+  useEffect(() => {
+    const syncWithServer = async () => {
+      if (!user) return; // Guard: No sincronizar si no hay sesión
+
+      try {
+        const config = await themeApiService.getConfig();
+        
+        // Actualizar modo
+        if (config.themeMode && config.themeMode !== theme) {
+          setTheme(config.themeMode as Theme);
+        }
+
+        // Actualizar colores personalizados
+        if (config.customActive) {
+          if (config.lightColors) {
+            setCustomLightColors(config.lightColors);
+            localStorage.setItem(LS_CUSTOM_LIGHT, JSON.stringify(config.lightColors));
+          }
+          if (config.darkColors) {
+            setCustomDarkColors(config.darkColors);
+            localStorage.setItem(LS_CUSTOM_DARK, JSON.stringify(config.darkColors));
+          }
+          setIsCustomThemeActive(true);
+          localStorage.setItem(LS_CUSTOM_ACTIVE, 'true');
+        } else if (isCustomThemeActive) {
+          // Si en el servidor está desactivado pero aquí activo, resetear
+          setIsCustomThemeActive(false);
+          localStorage.setItem(LS_CUSTOM_ACTIVE, 'false');
+          clearCustomColorsFromDOM();
+        }
+
+        // Cargar temas guardados de la API
+        const savedFromApi = await themeApiService.getSavedThemes();
+        const mappedSaved: SavedTheme[] = savedFromApi.map(t => ({
+          id: t.id,
+          name: t.name,
+          baseColor: t.baseColor || '#000000',
+          lightColors: t.lightColors,
+          darkColors: t.darkColors,
+          createdAt: t.createdAt
+        }));
+        setSavedThemes(mappedSaved);
+      } catch (error: any) {
+        // No mostrar error ruidoso si es un 401 (ya lo manejará AuthContext)
+        if (error.message !== 'Unauthorized') {
+          console.error('Error sincronizando temas con el servidor:', error);
+        }
+      }
+    };
+
+    syncWithServer();
+  }, [user]);
+
+  // 3. Script de Migración One-Time (localStorage -> Server)
+  useEffect(() => {
+    if (!user || !isAdmin || localStorage.getItem(LS_MIGRATED)) return;
+
+    const migrate = async () => {
+      try {
+        const localSaved = loadJSON<SavedTheme[]>(LS_SAVED_THEMES, []);
+        if (localSaved.length > 0) {
+          console.log('Migrando temas locales al servidor...');
+          for (const t of localSaved) {
+            await themeApiService.saveTheme({
+              name: t.name,
+              lightColors: t.lightColors,
+              darkColors: t.darkColors,
+              baseColor: t.baseColor
+            });
+          }
+        }
+        
+        // Si hay un tema activo localmente, subirlo como config global
+        if (isCustomThemeActive && customLightColors && customDarkColors) {
+          await themeApiService.updateConfig({
+            themeMode: theme,
+            customActive: true,
+            lightColors: customLightColors,
+            darkColors: customDarkColors
+          });
+        }
+
+        localStorage.setItem(LS_MIGRATED, 'true');
+        console.log('Migración de temas completada.');
+      } catch (error) {
+        console.error('Error durante la migración de temas:', error);
+      }
+    };
+
+    migrate();
+  }, [user, isAdmin]);
+
   // --- Acciones ---
   const toggleTheme = () => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  const applyCustomColors = (light: ColorPalette, dark: ColorPalette) => {
+  const applyCustomColors = async (light: ColorPalette, dark: ColorPalette) => {
+    // 1. Actualizar estado local y caché (Instantáneo)
     setCustomLightColors(light);
     setCustomDarkColors(dark);
     setIsCustomThemeActive(true);
     localStorage.setItem(LS_CUSTOM_LIGHT, JSON.stringify(light));
     localStorage.setItem(LS_CUSTOM_DARK, JSON.stringify(dark));
     localStorage.setItem(LS_CUSTOM_ACTIVE, JSON.stringify(true));
-    // Aplicar inmediatamente
+    
+    // Aplicar inmediatamente al DOM
     const active = theme === 'light' ? light : dark;
     applyColorsToDOM(active);
+
+    // 2. Sincronizar con el servidor si es admin
+    if (isAdmin) {
+      try {
+        await themeApiService.updateConfig({
+          themeMode: theme,
+          customActive: true,
+          lightColors: light,
+          darkColors: dark
+        });
+      } catch (error) {
+        console.error('Error al persistir tema en el servidor:', error);
+      }
+    }
   };
 
-  const resetToDefault = () => {
+  const resetToDefault = async () => {
     setCustomLightColors(null);
     setCustomDarkColors(null);
     setIsCustomThemeActive(false);
@@ -141,26 +258,55 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(LS_CUSTOM_DARK);
     localStorage.setItem(LS_CUSTOM_ACTIVE, JSON.stringify(false));
     clearCustomColorsFromDOM();
+
+    if (isAdmin) {
+      try {
+        await themeApiService.resetConfig();
+      } catch (error) {
+        console.error('Error al resetear tema en el servidor:', error);
+      }
+    }
   };
 
-  const saveTheme = (name: string, light: ColorPalette, dark: ColorPalette, baseColor: string) => {
-    const newTheme: SavedTheme = {
-      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 9),
-      name,
-      baseColor,
-      lightColors: light,
-      darkColors: dark,
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [...savedThemes, newTheme];
-    setSavedThemes(updated);
-    localStorage.setItem(LS_SAVED_THEMES, JSON.stringify(updated));
+  const saveTheme = async (name: string, light: ColorPalette, dark: ColorPalette, baseColor: string) => {
+    if (!isAdmin) return;
+
+    try {
+      const saved = await themeApiService.saveTheme({
+        name,
+        lightColors: light,
+        darkColors: dark,
+        baseColor
+      });
+
+      const newTheme: SavedTheme = {
+        id: saved.id,
+        name: saved.name,
+        baseColor: saved.baseColor || baseColor,
+        lightColors: saved.lightColors,
+        darkColors: saved.darkColors,
+        createdAt: saved.createdAt,
+      };
+
+      const updated = [...savedThemes, newTheme];
+      setSavedThemes(updated);
+      localStorage.setItem(LS_SAVED_THEMES, JSON.stringify(updated));
+    } catch (error) {
+      console.error('Error al guardar tema en el servidor:', error);
+    }
   };
 
-  const deleteTheme = (id: string) => {
-    const updated = savedThemes.filter(t => t.id !== id);
-    setSavedThemes(updated);
-    localStorage.setItem(LS_SAVED_THEMES, JSON.stringify(updated));
+  const deleteTheme = async (id: string) => {
+    if (!isAdmin) return;
+
+    try {
+      await themeApiService.deleteTheme(id);
+      const updated = savedThemes.filter(t => t.id !== id);
+      setSavedThemes(updated);
+      localStorage.setItem(LS_SAVED_THEMES, JSON.stringify(updated));
+    } catch (error) {
+      console.error('Error al eliminar tema del servidor:', error);
+    }
   };
 
   const loadTheme = (id: string) => {

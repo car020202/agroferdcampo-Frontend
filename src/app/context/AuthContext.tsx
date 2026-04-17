@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { apiRequest } from '../config/api';
 
 interface User {
@@ -42,14 +42,45 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem('agro-user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
-
   const [token, setToken] = useState<string | null>(() => {
     return localStorage.getItem('agro-token');
   });
+
+  const [user, setUser] = useState<User | null>(() => {
+    const savedToken = localStorage.getItem('agro-token');
+    const savedUser = localStorage.getItem('agro-user');
+    if (!savedToken || !savedUser) return null;
+    return JSON.parse(savedUser);
+  });
+
+  // Verificar sesión al montar la app
+  useEffect(() => {
+    const verifySession = async () => {
+      const savedToken = localStorage.getItem('agro-token');
+      if (!savedToken) return;
+
+      try {
+        const backendUser = await apiRequest<BackendUser>('/auth/me');
+        const mappedUser: User = {
+          id: backendUser.id.toString(),
+          name: backendUser.fullName,
+          email: backendUser.email,
+          role: backendUser.role,
+          roleId: backendUser.roleId,
+          phone: backendUser.phone,
+          dui: backendUser.dui,
+          branch: 'Todas'
+        };
+        setUser(mappedUser);
+        localStorage.setItem('agro-user', JSON.stringify(mappedUser));
+      } catch (error) {
+        console.error('Sesión inválida o expirada:', error);
+        logout(); // Limpiar todo si el token ya no sirve
+      }
+    };
+
+    verifySession();
+  }, []);
 
   const login = async (email: string, password: string): Promise<LoginResponse> => {
     try {

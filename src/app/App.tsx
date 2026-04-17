@@ -6,12 +6,12 @@ import { router } from './routes';
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider>
         <BranchProvider>
           <RouterProvider router={router} />
         </BranchProvider>
-      </AuthProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
