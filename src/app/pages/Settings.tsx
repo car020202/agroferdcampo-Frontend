@@ -65,7 +65,7 @@ export function Settings() {
           >
             <div className="flex items-start gap-4">
               <div
-                className="p-3 rounded-lg"
+                className="p-3 rounded-lg shadow-sm"
                 style={{
                   background: 'linear-gradient(135deg, var(--accent), var(--primary))',
                 }}
@@ -115,8 +115,8 @@ export function Settings() {
           >
             <div className="flex items-start gap-4">
               <div
-                className="p-3 rounded-lg"
-                style={{ backgroundColor: 'var(--accent)', opacity: 0.9 }}
+                className="p-3 rounded-lg shadow-sm"
+                style={{ backgroundColor: 'var(--primary)' }}
               >
                 <section.icon size={28} style={{ color: '#ffffff' }} />
               </div>

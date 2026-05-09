@@ -19,6 +19,9 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
 import { cn } from "../components/ui/utils";
 import { toast } from "sonner";
 import {
@@ -180,152 +183,181 @@ export function Branches() {
 
   return (
     <div className="animate-in fade-in duration-500">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold" style={{ color: "var(--text-main)" }}>
-            Sucursales
-          </h1>
-          <p style={{ color: "var(--text-sec)" }}>Gestionar locales físicos y datos fiscales</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-[var(--primary)]/10 text-[var(--primary)] shadow-sm border border-[var(--primary)]/20">
+            <Building2 size={32} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black uppercase tracking-tight" style={{ color: "var(--text-main)" }}>
+              Sucursales
+            </h1>
+            <p className="text-xs font-bold uppercase tracking-widest opacity-60" style={{ color: "var(--text-sec)" }}>
+              Gestión de locales físicos y datos fiscales
+            </p>
+          </div>
         </div>
         {isAdmin && (
           <Button
             onClick={() => handleOpenModal()}
-            size="lg"
-            className="gap-2 font-bold shadow-lg transition-all hover:scale-105 active:scale-95"
-            style={{ backgroundColor: "var(--color-accent)", color: "#ffffff" }}
+            className="h-12 px-8 rounded-2xl bg-[var(--primary)] text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-[var(--primary)]/20 hover:shadow-2xl hover:shadow-[var(--primary)]/40 hover:-translate-y-1 transition-all active:scale-95 gap-3"
           >
-            <Plus size={20} />
+            <Plus size={20} className="stroke-[3]" />
             Nueva Sucursal
           </Button>
         )}
       </div>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div
-          className="p-5 rounded-2xl border flex items-center gap-4 shadow-sm"
-          style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}
-        >
-          <div className="p-3 rounded-xl bg-blue-500/10 text-blue-500">
-            <Building2 size={24} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {[
+          {
+            label: "Total Sucursales",
+            value: branches.length,
+            icon: Building2,
+            color: "blue",
+            bg: "bg-blue-500/10",
+            text: "text-blue-500",
+          },
+          {
+            label: "Sucursales Activas",
+            value: branches.filter((b) => b.isActive).length,
+            icon: CheckCircle2,
+            color: "emerald",
+            bg: "bg-emerald-500/10",
+            text: "text-emerald-500",
+          },
+          {
+            label: "Sucursales Inactivas",
+            value: branches.filter((b) => !b.isActive).length,
+            icon: XCircle,
+            color: "rose",
+            bg: "bg-rose-500/10",
+            text: "text-rose-500",
+          },
+        ].map((stat, i) => (
+          <div
+            key={i}
+            className="group p-6 rounded-3xl border bg-[var(--card)] border-[var(--border)] shadow-sm hover:shadow-md transition-all relative overflow-hidden"
+          >
+            <div className={cn("absolute top-0 right-0 w-24 h-24 rounded-bl-full opacity-5 transition-transform group-hover:scale-110", stat.bg)} />
+            
+            <div className="flex items-center gap-5">
+              <div className={cn("p-4 rounded-2xl shadow-sm transition-transform group-hover:scale-110", stat.bg, stat.text)}>
+                <stat.icon size={28} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1" style={{ color: "var(--text-sec)" }}>
+                  {stat.label}
+                </p>
+                <p className={cn("text-3xl font-black tracking-tight", stat.text)}>
+                  {stat.value}
+                </p>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium" style={{ color: "var(--text-sec)" }}>Total</p>
-            <p className="text-2xl font-bold" style={{ color: "var(--text-main)" }}>{branches.length}</p>
-          </div>
-        </div>
-        <div
-          className="p-5 rounded-2xl border flex items-center gap-4 shadow-sm"
-          style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}
-        >
-          <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500">
-            <CheckCircle2 size={24} />
-          </div>
-          <div>
-            <p className="text-sm font-medium" style={{ color: "var(--text-sec)" }}>Activas</p>
-            <p className="text-2xl font-bold text-emerald-500">{branches.filter(b => b.isActive).length}</p>
-          </div>
-        </div>
-        <div
-          className="p-5 rounded-2xl border flex items-center gap-4 shadow-sm"
-          style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}
-        >
-          <div className="p-3 rounded-xl bg-red-500/10 text-red-500">
-            <XCircle size={24} />
-          </div>
-          <div>
-            <p className="text-sm font-medium" style={{ color: "var(--text-sec)" }}>Inactivas</p>
-            <p className="text-2xl font-bold text-red-500">{branches.filter(b => !b.isActive).length}</p>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Search Bar */}
       <div
-        className="p-4 rounded-2xl border mb-6 shadow-sm"
-        style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}
+        className="p-5 rounded-3xl border mb-8 bg-[var(--card)] border-[var(--border)] shadow-sm"
       >
         <div
-          className="flex items-center gap-3 px-4 py-1 rounded-xl border transition-all focus-within:ring-2 focus-within:ring-[var(--color-accent)]/20"
-          style={{ backgroundColor: "var(--bg)", borderColor: "var(--border)" }}
+          className="flex items-center gap-4 px-5 py-3 rounded-2xl bg-[var(--bg)] border border-[var(--border)] transition-all focus-within:ring-2 focus-within:ring-[var(--primary)]/20 group"
         >
-          <Search size={20} className="text-muted-foreground" />
+          <Search size={20} className="text-muted-foreground group-focus-within:text-[var(--primary)] transition-colors" />
           <Input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar sucursal por nombre o dirección..."
-            className="border-none bg-transparent shadow-none focus-visible:ring-0 h-9"
+            placeholder="Buscar sucursal por nombre, dirección o NIT..."
+            className="border-none bg-transparent shadow-none focus-visible:ring-0 h-auto p-0 font-bold placeholder:text-muted-foreground/50 text-sm"
           />
         </div>
       </div>
 
       {/* Branches Table */}
       <div
-        className="rounded-2xl border border-separate overflow-hidden shadow-sm"
-        style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}
+        className="rounded-3xl border bg-[var(--card)] border-[var(--border)] overflow-hidden shadow-sm"
       >
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow
-                className="bg-muted/50"
-              >
-                <TableHead className="font-semibold">Sucursal</TableHead>
-                <TableHead className="font-semibold">Ubicación</TableHead>
-                <TableHead className="font-semibold">NIT / Registro</TableHead>
-                <TableHead className="font-semibold">Contacto</TableHead>
-                <TableHead className="font-semibold text-center">Estado</TableHead>
-                {isAdmin && <TableHead className="font-semibold text-center">Acciones</TableHead>}
+              <TableRow className="bg-[var(--bg)]/50 border-b border-[var(--border)] hover:bg-[var(--bg)]/50">
+                <TableHead className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sucursal</TableHead>
+                <TableHead className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Ubicación</TableHead>
+                <TableHead className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">NIT / Registro</TableHead>
+                <TableHead className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Contacto</TableHead>
+                <TableHead className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-center">Estado</TableHead>
+                {isAdmin && <TableHead className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-center">Acciones</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredBranches.map((b) => (
-                <TableRow key={b.id} className="border-b last:border-b-0 hover:bg-[var(--bg)] transition-colors" style={{ borderColor: "var(--border)" }}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center font-bold"
-                        style={{ backgroundColor: "var(--bg)", color: "var(--accent)", border: "1px solid var(--border)" }}
-                      >
-                        <Building2 size={20} />
+                <TableRow
+                  key={b.id}
+                  className="border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--primary)]/[0.02] transition-colors group"
+                >
+                  <TableCell className="py-5 px-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center font-black transition-transform group-hover:scale-110 shadow-sm border border-[var(--primary)]/20">
+                        <Building2 size={24} />
                       </div>
-                      <p className="font-semibold">{b.name}</p>
+                      <div>
+                        <p className="font-black text-sm uppercase tracking-tight" style={{ color: "var(--text-main)" }}>
+                          {b.name}
+                        </p>
+                        <p className="text-[10px] font-mono font-bold opacity-40 uppercase tracking-tighter">
+                          ID: {String(b.id).padStart(3, "0")}
+                        </p>
+                      </div>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium text-muted-foreground">
-                    <div className="flex items-start gap-1.5 max-w-xs">
-                      <MapPin size={16} className="mt-0.5 shrink-0 opacity-60" />
-                      <span className="text-sm line-clamp-2">{b.address || "No especificada"}</span>
+                  <TableCell className="py-5 px-6">
+                    <div className="flex items-start gap-2 max-w-[200px]">
+                      <MapPin size={16} className="mt-0.5 shrink-0 text-[var(--primary)] opacity-60" />
+                      <span className="text-xs font-bold leading-relaxed opacity-70" style={{ color: "var(--text-main)" }}>
+                        {b.address || "No especificada"}
+                      </span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <FileText size={16} className="opacity-60" />
-                      <span className="font-mono text-sm">{b.taxId || "---"}</span>
+                  <TableCell className="py-5 px-6">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
+                        <FileText size={14} className="text-[var(--primary)] opacity-60" />
+                      </div>
+                      <span className="font-mono text-xs font-black tracking-tighter opacity-80">{b.taxId || "---"}</span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Phone size={16} className="opacity-60" />
-                      <span>{b.phone || "---"}</span>
+                  <TableCell className="py-5 px-6">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
+                        <Phone size={14} className="text-[var(--primary)] opacity-60" />
+                      </div>
+                      <span className="text-xs font-black tracking-tight opacity-70">{b.phone || "---"}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="py-5 px-6 text-center">
                     <Badge
-                      variant={b.isActive ? "default" : "destructive"}
+                      className={cn(
+                        "font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-full border shadow-sm",
+                        b.isActive
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                          : "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                      )}
                     >
                       {b.isActive ? "Activa" : "Inactiva"}
                     </Badge>
                   </TableCell>
                   {isAdmin && (
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-2">
+                    <TableCell className="py-5 px-6 text-center">
+                      <div className="flex items-center justify-center gap-3">
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleOpenModal(b)}
-                          className="text-muted-foreground hover:text-[var(--color-accent)]"
+                          className="h-9 w-9 rounded-xl text-muted-foreground hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 transition-all"
                           title="Editar Sucursal"
                         >
                           <Edit size={18} />
@@ -333,11 +365,12 @@ export function Branches() {
                         <Switch
                           checked={b.isActive}
                           onCheckedChange={() => handleToggleClick(b)}
+                          className="data-[state=checked]:bg-emerald-500"
                         />
                       </div>
                     </TableCell>
                   )}
-                  </TableRow>
+                </TableRow>
               ))}
             </TableBody>
           </Table>
@@ -350,113 +383,111 @@ export function Branches() {
       </div>
 
       {/* Modal - Estilo consistente con el sistema */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div
-            className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden scale-in-95 duration-200"
-            style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}
-          >
-            <div
-              className="flex items-center justify-between p-6 border-b"
-              style={{ borderColor: "var(--border)" }}
-            >
-              <h2 className="text-xl font-bold" style={{ color: "var(--text-main)" }}>
-                {editingBranch ? "Editar Sucursal" : "Nueva Sucursal"}
-              </h2>
-              <button onClick={() => setShowModal(false)} style={{ color: "var(--text-sec)" }}>
-                <X size={20} />
-              </button>
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-[var(--border)] bg-[var(--card)] shadow-2xl">
+          <DialogHeader className="p-6 border-b border-[var(--border)] bg-[var(--bg)]/50">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--primary)] text-white flex items-center justify-center shadow-lg shadow-[var(--primary)]/20">
+                <Building2 size={24} />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight text-[var(--text-main)]">
+                  {editingBranch ? "Editar Sucursal" : "Nueva Sucursal"}
+                </DialogTitle>
+                <p className="text-[10px] font-bold uppercase tracking-widest opacity-60" style={{ color: "var(--text-sec)" }}>
+                  Información del Establecimiento
+                </p>
+              </div>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {formError && (
-                <div className="p-3 rounded-xl text-sm flex items-center gap-2 bg-red-500/10 text-red-500 border border-red-500/20">
-                  <AlertCircle size={18} />
-                  {formError}
-                </div>
-              )}
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold mb-1.5 uppercase opacity-70" style={{ color: "var(--text-sec)" }}>
-                    Nombre de la Sucursal
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Sucursal Santa Tecla"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border outline-none bg-transparent transition-all focus:border-[var(--accent)]"
-                    style={{ borderColor: "var(--border)", color: "var(--text-main)" }}
-                  />
-                </div>
+          </DialogHeader>
 
-                <div>
-                  <label className="block text-xs font-bold mb-1.5 uppercase opacity-70" style={{ color: "var(--text-sec)" }}>
-                    Dirección
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="Ej. Final 4a Calle Poniente #23..."
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border outline-none bg-transparent transition-all focus:border-[var(--accent)] resize-none"
-                    style={{ borderColor: "var(--border)", color: "var(--text-main)" }}
-                  />
-                </div>
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            {formError && (
+              <div className="p-4 rounded-2xl text-sm flex items-center gap-3 bg-rose-500/10 text-rose-600 border border-rose-500/20 font-bold animate-in slide-in-from-top-2">
+                <AlertCircle size={20} />
+                {formError}
+              </div>
+            )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5 uppercase opacity-70" style={{ color: "var(--text-sec)" }}>
-                      Teléfono
-                    </label>
-                    <input
-                      type="text"
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase font-black opacity-60 tracking-widest">
+                  Nombre de la Sucursal
+                </Label>
+                <Input
+                  required
+                  placeholder="Ej. Sucursal Santa Tecla"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="bg-[var(--bg)] border-[var(--border)] font-bold h-11 px-4 rounded-xl focus-visible:ring-[var(--primary)]/20"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase font-black opacity-60 tracking-widest">
+                  Dirección Completa
+                </Label>
+                <Textarea
+                  rows={3}
+                  placeholder="Ej. Final 4a Calle Poniente #23, Santa Tecla..."
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="bg-[var(--bg)] border-[var(--border)] font-bold px-4 py-3 rounded-xl focus-visible:ring-[var(--primary)]/20 resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] uppercase font-black opacity-60 tracking-widest">
+                    Teléfono
+                  </Label>
+                  <div className="relative">
+                    <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--primary)] opacity-40" />
+                    <Input
                       placeholder="2222-2222"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border outline-none bg-transparent focus:border-[var(--accent)]"
-                      style={{ borderColor: "var(--border)", color: "var(--text-main)" }}
+                      className="bg-[var(--bg)] border-[var(--border)] font-bold h-11 pl-10 rounded-xl focus-visible:ring-[var(--primary)]/20"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5 uppercase opacity-70" style={{ color: "var(--text-sec)" }}>
-                      NIT / NRC
-                    </label>
-                    <input
-                      type="text"
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] uppercase font-black opacity-60 tracking-widest">
+                    NIT / NRC
+                  </Label>
+                  <div className="relative">
+                    <FileText size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--primary)] opacity-40" />
+                    <Input
                       placeholder="0614-..."
                       value={formData.taxId}
                       onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border outline-none bg-transparent focus:border-[var(--accent)]"
-                      style={{ borderColor: "var(--border)", color: "var(--text-main)" }}
+                      className="bg-[var(--bg)] border-[var(--border)] font-bold h-11 pl-10 rounded-xl focus-visible:ring-[var(--primary)]/20 font-mono"
                     />
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex gap-3 pt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 py-3 rounded-xl border font-bold transition-all hover:bg-[var(--bg)]"
-                  style={{ borderColor: "var(--border)", color: "var(--text-main)" }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="flex-1 py-3 rounded-xl font-bold text-white shadow-lg transition-all active:scale-95 disabled:opacity-50"
-                  style={{ backgroundColor: "var(--accent)" }}
-                >
-                  {formLoading ? "Guardando..." : "Guardar Sucursal"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowModal(false)}
+                className="flex-1 h-12 rounded-xl font-black uppercase tracking-widest text-[10px]"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={formLoading}
+                className="flex-1 h-12 rounded-xl bg-[var(--primary)] text-white font-black uppercase tracking-widest text-[10px] shadow-lg shadow-[var(--primary)]/20"
+              >
+                {formLoading ? "Guardando..." : editingBranch ? "Actualizar" : "Guardar Sucursal"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmation Dialog */}
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
