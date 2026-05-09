@@ -18,6 +18,7 @@ import { Branches as BranchesPage } from "./pages/Branches";
 import { HumanResources } from "./pages/HumanResources";
 import { Catalog } from "./pages/Catalog";
 import { UIComponentsShowcase } from "./pages/UIComponentsShowcase";
+import { SalesHistory } from "./pages/SalesHistory";
 
 export const router = createBrowserRouter([
   {
@@ -46,6 +47,10 @@ export const router = createBrowserRouter([
       {
         path: "pos",
         element: <POS />,
+      },
+      {
+        path: "sales",
+        element: <SalesHistory />,
       },
       {
         path: "catalog",

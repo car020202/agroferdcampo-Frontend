@@ -20,6 +20,7 @@ import {
 const navLinks = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/pos", icon: ShoppingCart, label: "Punto de Venta" },
+  { path: "/sales", icon: FileText, label: "Historial de Ventas" },
   { path: "/catalog", icon: Store, label: "Catálogo", roles: [1, 2] },
   { path: "/inventory", icon: Package, label: "Inventario" },
   { path: "/customers", icon: Users, label: "Clientes" },

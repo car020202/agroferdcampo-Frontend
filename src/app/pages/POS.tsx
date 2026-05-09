@@ -12,14 +12,20 @@ import {
   Package,
   UserPlus,
   X,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCcw,
+  FileText
 } from "lucide-react";
 import { apiRequest } from "../config/api";
+import { createSale, sendFacturaConsumidor, sendCreditoFiscal } from "../services/sales.service";
 import { toast } from "sonner";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { NumberInput } from "../components/ui/number-input";
 import { CustomerQuickCreate } from "../components/customers/CustomerQuickCreate";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../components/ui/dialog";
 import { cn } from "../components/ui/utils";
 import { useAuth } from "../context/AuthContext";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -68,6 +74,9 @@ export function POS() {
   );
   const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
+
+  // New Checkout States
+  const [processingOverlay, setProcessingOverlay] = useState(false);
 
   // Initial Load
   useEffect(() => {
@@ -252,31 +261,33 @@ export function POS() {
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
+    setProcessingOverlay(true);
     setLoading(true);
+
     try {
-      await apiRequest("/sales", {
-        method: "POST",
-        body: JSON.stringify({
-          customerId: selectedCustomer?.id,
-          paymentMethod: selectedPayment,
-          totalAmount: total,
-          taxAmount: iva,
-          items: cart.map((i) => ({
-            productId: i.id,
-            quantity: i.quantity,
-            unitPrice: i.price,
-          })),
-        }),
+      // Paso 1: Crear venta y descontar stock
+      await createSale({
+        customerId: selectedCustomer?.id,
+        paymentMethod: selectedPayment,
+        totalAmount: total,
+        taxAmount: iva,
+        items: cart.map((i) => ({
+          productId: i.id,
+          quantity: i.quantity,
+          unitPrice: i.price,
+        })),
       });
 
-      toast.success("Venta procesada exitosamente");
+      toast.success("Venta registrada exitosamente");
       setCart([]);
       setSearchTerm("");
       setProducts([]);
       setSelectedCustomer(null);
+
     } catch (error: any) {
-      toast.error(error.message || "Error al procesar la venta");
+      toast.error(error.message || "Error al procesar la venta. Verifique el stock.");
     } finally {
+      setProcessingOverlay(false);
       setLoading(false);
     }
   };
@@ -620,6 +631,15 @@ export function POS() {
           setCustomerSearch("");
         }}
       />
+
+      {/* 1. Overlay Bloqueante (Procesando) */}
+      {processingOverlay && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center text-white animate-in fade-in duration-300">
+          <div className="animate-spin h-16 w-16 border-4 border-white border-t-transparent rounded-full mb-6 shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
+          <h2 className="text-3xl font-black tracking-tight mb-2">Procesando cobro...</h2>
+          <p className="text-lg opacity-80 font-medium">Por favor, no cierre esta ventana.</p>
+        </div>
+      )}
     </div>
   );
 }
