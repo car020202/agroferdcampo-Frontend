@@ -48,6 +48,7 @@ export function Purchases() {
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
   const [receiveForm, setReceiveForm] = useState({ documentType: 'FACTURA' as any, documentNumber: '', notes: '' });
   const [receiving, setReceiving] = useState(false);
+  const [receivedItems, setReceivedItems] = useState<Array<{ productId: number; productName: string; quantity: number; received: number }>>([]);
 
   useEffect(() => {
     if (activeTab === 'compras') {
@@ -149,19 +150,50 @@ export function Purchases() {
     }
   };
 
+  const handleOpenReceiveModal = async (purchase: PurchaseResponse) => {
+    try {
+      const fullPurchase = await purchasesService.getPurchaseDetail(purchase.id);
+      setSelectedPurchase(fullPurchase);
+      setReceivedItems(
+        fullPurchase.items.map((item: any) => ({
+          productId: item.productId,
+          productName: item.product?.name || 'Producto',
+          quantity: item.quantity,
+          received: item.quantity
+        }))
+      );
+      setReceiveForm({ documentType: 'FACTURA', documentNumber: '', notes: '' });
+      setReceiveModalOpen(true);
+    } catch (e) {
+      toast.error('Error al obtener los detalles de la orden');
+    }
+  };
+
   const handleReceivePurchaseSubmit = async () => {
     if (!selectedPurchase) return;
     if (!receiveForm.documentNumber) {
       toast.error("El número de documento es obligatorio");
       return;
     }
+
+    for (const item of receivedItems) {
+      if (item.received < 0) {
+        toast.error(`La cantidad recibida de ${item.productName} no puede ser negativa.`);
+        return;
+      }
+      if (item.received > item.quantity) {
+        toast.error(`La cantidad recibida de ${item.productName} (${item.received}) no puede exceder la cantidad ordenada (${item.quantity}).`);
+        return;
+      }
+    }
+
     setReceiving(true);
     try {
       const payload = {
         notes: receiveForm.notes || `Doc: ${receiveForm.documentType} ${receiveForm.documentNumber}`,
-        items: selectedPurchase.items.map((item: any) => ({
+        items: receivedItems.map((item) => ({
           productId: item.productId,
-          received: Number(item.quantity) // Asume recepción total
+          received: Number(item.received)
         }))
       };
 
@@ -411,7 +443,7 @@ export function Purchases() {
 
                           {purchase.status === 'CONFIRMADA' && (
                             <DropdownMenuItem 
-                              onClick={() => { setSelectedPurchase(purchase); setReceiveModalOpen(true); }}
+                              onClick={() => handleOpenReceiveModal(purchase)}
                               className="font-bold cursor-pointer text-emerald-600"
                             >
                               <ArrowDownToLine size={14} className="mr-2" /> Recibir Mercadería
@@ -454,7 +486,7 @@ export function Purchases() {
 
       {/* --- MODAL CREAR ORDEN --- */}
       <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 border-b">
             <DialogTitle className="flex items-center gap-2 text-2xl">
               <Package className="text-[var(--primary)]" />
@@ -592,7 +624,7 @@ export function Purchases() {
 
       {/* --- MODAL DETALLE --- */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="max-w-3xl flex flex-col p-0">
+        <DialogContent className="sm:max-w-3xl flex flex-col p-0">
           {selectedPurchase && (
             <>
               <DialogHeader className="p-6 border-b">
@@ -636,7 +668,7 @@ export function Purchases() {
 
       {/* --- MODAL RECIBIR MERCADERÍA --- */}
       <Dialog open={receiveModalOpen} onOpenChange={setReceiveModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowDownToLine className="text-emerald-500" />
@@ -646,35 +678,73 @@ export function Purchases() {
               OC-{selectedPurchase?.id.toString().padStart(6, '0')} - Esto ingresará los productos al inventario inmediatamente.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Tipo de Documento Recibido</Label>
-              <Select value={receiveForm.documentType} onValueChange={(v: any) => setReceiveForm({...receiveForm, documentType: v})}>
-                <SelectTrigger><SelectValue/></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="FACTURA">Factura Consumidor Final</SelectItem>
-                  <SelectItem value="CREDITO_FISCAL">Comprobante Crédito Fiscal</SelectItem>
-                  <SelectItem value="TICKET">Ticket</SelectItem>
-                  <SelectItem value="OTRO">Otro</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Tipo de Documento Recibido</Label>
+                <Select value={receiveForm.documentType} onValueChange={(v: any) => setReceiveForm({...receiveForm, documentType: v})}>
+                  <SelectTrigger className="bg-[var(--card)]"><SelectValue/></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FACTURA">Factura Consumidor Final</SelectItem>
+                    <SelectItem value="CREDITO_FISCAL">Comprobante Crédito Fiscal</SelectItem>
+                    <SelectItem value="TICKET">Ticket</SelectItem>
+                    <SelectItem value="OTRO">Otro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Número de Documento</Label>
+                <Input 
+                  required 
+                  placeholder="Ej. FAC-12345"
+                  value={receiveForm.documentNumber}
+                  onChange={e => setReceiveForm({...receiveForm, documentNumber: e.target.value})}
+                  className="bg-[var(--card)]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Notas Adicionales (Opcional)</Label>
+                <Input 
+                  placeholder="Observaciones de la entrega..."
+                  value={receiveForm.notes}
+                  onChange={e => setReceiveForm({...receiveForm, notes: e.target.value})}
+                  className="bg-[var(--card)]"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Número de Documento</Label>
-              <Input 
-                required 
-                placeholder="Ej. FAC-12345"
-                value={receiveForm.documentNumber}
-                onChange={e => setReceiveForm({...receiveForm, documentNumber: e.target.value})}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Notas Adicionales (Opcional)</Label>
-              <Input 
-                placeholder="Observaciones de la entrega..."
-                value={receiveForm.notes}
-                onChange={e => setReceiveForm({...receiveForm, notes: e.target.value})}
-              />
+
+            <div className="border rounded-xl p-4 bg-[var(--bg)]/50 max-h-[300px] overflow-y-auto space-y-2">
+              <Label className="font-bold text-xs uppercase text-[var(--text-sec)]">Cantidades Físicas Recibidas</Label>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs p-2">Producto</TableHead>
+                    <TableHead className="text-xs text-center p-2 w-16">Ord.</TableHead>
+                    <TableHead className="text-xs text-center p-2 w-24">Recibido</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {receivedItems.map((item, idx) => (
+                    <TableRow key={item.productId}>
+                      <TableCell className="text-xs p-2 font-medium">{item.productName}</TableCell>
+                      <TableCell className="text-xs text-center p-2">{item.quantity}</TableCell>
+                      <TableCell className="p-1">
+                        <NumberInput
+                          value={item.received}
+                          min={0}
+                          max={item.quantity}
+                          onValueChange={(val) => {
+                            const newItems = [...receivedItems];
+                            newItems[idx].received = val || 0;
+                            setReceivedItems(newItems);
+                          }}
+                          className="h-8 text-xs bg-[var(--card)] text-center"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </div>
           <DialogFooter>

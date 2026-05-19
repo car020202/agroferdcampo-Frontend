@@ -25,6 +25,7 @@ const navLinks = [
   { path: "/catalog", icon: Store, label: "Catálogo", roles: [1, 2] },
   { path: "/inventory", icon: Package, label: "Inventario" },
   { path: "/purchases", icon: TruckIcon, label: "Compras a Prov." },
+  { path: "/delivery-notes", icon: TruckIcon, label: "Albaranes" },
   { path: "/customers", icon: Users, label: "Clientes" },
   { path: "/users", icon: UserCog, label: "Usuarios", roles: [1, 2] },
   { path: "/rrhh", icon: Briefcase, label: "Recursos Humanos", roles: [1, 2, 3] },

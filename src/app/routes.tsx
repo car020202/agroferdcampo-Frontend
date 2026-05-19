@@ -20,6 +20,7 @@ import { UIComponentsShowcase } from "./pages/UIComponentsShowcase";
 import { SalesHistory } from "./pages/SalesHistory";
 import { Quotes } from "./pages/Quotes";
 import { Purchases } from "./pages/Purchases";
+import { DeliveryNotes } from "./pages/DeliveryNotes";
 
 export const router = createBrowserRouter([
   {
@@ -76,6 +77,10 @@ export const router = createBrowserRouter([
       {
         path: "purchases",
         element: <Purchases />,
+      },
+      {
+        path: "delivery-notes",
+        element: <DeliveryNotes />,
       },
       {
         path: "finance",

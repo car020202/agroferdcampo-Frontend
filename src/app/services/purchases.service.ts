@@ -14,10 +14,14 @@ export interface CreatePurchaseDto {
   items: PurchaseItemDto[];
 }
 
+export interface ReceivePurchaseItemDto {
+  productId: number;
+  received: number;
+}
+
 export interface ReceivePurchaseDto {
-  documentType: 'FACTURA' | 'CREDITO_FISCAL' | 'TICKET' | 'OTRO';
-  documentNumber: string;
   notes?: string;
+  items: ReceivePurchaseItemDto[];
 }
 
 export interface PayPurchaseDto {
