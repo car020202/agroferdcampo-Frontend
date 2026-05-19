@@ -15,10 +15,15 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCcw,
-  FileText
+  FileText,
+  Lock,
+  Unlock,
+  Save
 } from "lucide-react";
 import { apiRequest } from "../config/api";
 import { createSale, sendFacturaConsumidor, sendCreditoFiscal } from "../services/sales.service";
+import { cashShiftsService, CashShift } from "../services/cash-shifts.service";
+import { quotesService } from "../services/quotes.service";
 import { toast } from "sonner";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -78,12 +83,116 @@ export function POS() {
   // New Checkout States
   const [processingOverlay, setProcessingOverlay] = useState(false);
 
+  // Cash Shift States
+  const [activeShift, setActiveShift] = useState<CashShift | null>(null);
+  const [loadingShift, setLoadingShift] = useState(true);
+  const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
+  const [initialAmount, setInitialAmount] = useState<number | "">("");
+  const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
+  const [countedCash, setCountedCash] = useState<number | "">("");
+  const [closeNotes, setCloseNotes] = useState("");
+  const [closeSummary, setCloseSummary] = useState<{ expectedAmount: number; countedCash: number; difference: number } | null>(null);
+
+  // Quote States
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [quoteValidDays, setQuoteValidDays] = useState<number | "">(15);
+
   // Initial Load
   useEffect(() => {
     if (user) {
+      checkActiveShift();
       searchProducts("");
     }
   }, [user]);
+
+  const checkActiveShift = async () => {
+    setLoadingShift(true);
+    try {
+      const shift = await cashShiftsService.getActiveShift();
+      if (shift) {
+        setActiveShift(shift);
+        setShowOpenShiftModal(false);
+      } else {
+        setActiveShift(null);
+        setShowOpenShiftModal(true);
+      }
+    } catch (error) {
+      toast.error("Error al verificar turno de caja");
+    } finally {
+      setLoadingShift(false);
+    }
+  };
+
+  const handleOpenShift = async () => {
+    if (initialAmount === "" || initialAmount < 0) {
+      toast.error("Ingrese un monto inicial válido");
+      return;
+    }
+    try {
+      setLoadingShift(true);
+      const shift = await cashShiftsService.openShift(Number(initialAmount));
+      setActiveShift(shift);
+      setShowOpenShiftModal(false);
+      toast.success("Caja abierta exitosamente");
+    } catch (error: any) {
+      toast.error(error.message || "Error al abrir caja");
+    } finally {
+      setLoadingShift(false);
+    }
+  };
+
+  const handleCloseShift = async () => {
+    if (countedCash === "" || countedCash < 0) {
+      toast.error("Ingrese el monto contado en caja");
+      return;
+    }
+    try {
+      setLoadingShift(true);
+      const res = await cashShiftsService.closeShift(Number(countedCash), closeNotes);
+      setCloseSummary(res.summary);
+      setActiveShift(null);
+      toast.success("Caja cerrada exitosamente");
+    } catch (error: any) {
+      toast.error(error.message || "Error al cerrar caja");
+    } finally {
+      setLoadingShift(false);
+    }
+  };
+
+  const handleSaveQuote = async () => {
+    if (cart.length === 0) return;
+    if (quoteValidDays === "" || quoteValidDays <= 0) {
+      toast.error("Ingrese una validez en días correcta");
+      return;
+    }
+    
+    setProcessingOverlay(true);
+    setLoading(true);
+
+    try {
+      await quotesService.createQuote({
+        customerId: selectedCustomer?.id,
+        validDays: Number(quoteValidDays),
+        items: cart.map((i) => ({
+          productId: i.id,
+          quantity: i.quantity,
+          unitPrice: i.price,
+        })),
+      });
+
+      toast.success("Cotización guardada exitosamente");
+      setCart([]);
+      setSearchTerm("");
+      searchProducts(""); // reload products
+      setSelectedCustomer(null);
+      setShowQuoteModal(false);
+    } catch (error: any) {
+      toast.error(error.message || "Error al guardar la cotización");
+    } finally {
+      setProcessingOverlay(false);
+      setLoading(false);
+    }
+  };
 
   // Debounce product search
   useEffect(() => {
@@ -306,9 +415,21 @@ export function POS() {
             Genera facturas y créditos fiscales al instante.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl border bg-[var(--card)] border-[var(--border)] text-[var(--text-sec)] shadow-sm">
-          <Package size={16} className="text-[var(--primary)]" />
-          <span className="font-bold">{user?.branch || "Sucursal"}</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl border bg-[var(--card)] border-[var(--border)] text-[var(--text-sec)] shadow-sm">
+            <Package size={16} className="text-[var(--primary)]" />
+            <span className="font-bold">{user?.branch || "Sucursal"}</span>
+          </div>
+          {activeShift && (
+            <Button
+              variant="outline"
+              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={() => setShowCloseShiftModal(true)}
+            >
+              <Lock size={16} className="mr-2" />
+              Cerrar Caja
+            </Button>
+          )}
         </div>
       </div>
 
@@ -603,21 +724,32 @@ export function POS() {
                 )}
               </div>
 
-              <Button
-                onClick={handleCheckout}
-                disabled={loading || cart.length === 0}
-                variant="premium"
-                size="xl"
-                className="w-full gap-3"
-              >
-                {loading ? (
-                  <div className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full" />
-                ) : (
-                  <>
-                    <Printer size={24} /> PROCESAR VENTA
-                  </>
-                )}
-              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={() => setShowQuoteModal(true)}
+                  disabled={loading || cart.length === 0}
+                  variant="outline"
+                  size="xl"
+                  className="w-full gap-2 border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white"
+                >
+                  <Save size={20} /> COTIZAR
+                </Button>
+                <Button
+                  onClick={handleCheckout}
+                  disabled={loading || cart.length === 0}
+                  variant="premium"
+                  size="xl"
+                  className="w-full gap-2"
+                >
+                  {loading ? (
+                    <div className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full" />
+                  ) : (
+                    <>
+                      <Printer size={20} /> COBRAR
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -640,6 +772,166 @@ export function POS() {
           <p className="text-lg opacity-80 font-medium">Por favor, no cierre esta ventana.</p>
         </div>
       )}
+
+      {/* 2. Modals de Caja */}
+      <Dialog open={showOpenShiftModal} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md [&>button]:hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Unlock className="text-[var(--primary)]" />
+              Apertura de Caja
+            </DialogTitle>
+            <DialogDescription>
+              Para iniciar ventas, debes abrir la caja ingresando el efectivo inicial.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Monto Inicial en Efectivo</label>
+              <NumberInput
+                value={initialAmount}
+                onValueChange={(val) => setInitialAmount(val === undefined ? "" : val)}
+                placeholder="Ej. 50.00"
+                className="text-lg font-bold"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={handleOpenShift}
+              disabled={loadingShift || initialAmount === ""}
+              className="w-full text-lg h-12"
+            >
+              {loadingShift ? "Abriendo..." : "Abrir Caja"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCloseShiftModal} onOpenChange={(open) => !loadingShift && setShowCloseShiftModal(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="text-red-500" />
+              Cierre de Caja
+            </DialogTitle>
+            <DialogDescription>
+              Ingresa el dinero físico contado en la gaveta.
+            </DialogDescription>
+          </DialogHeader>
+          {closeSummary ? (
+            <div className="space-y-4 py-4 animate-in fade-in zoom-in duration-300">
+              <div className="p-4 rounded-xl border bg-slate-50 space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Monto Esperado (Sistema):</span>
+                  <span className="font-bold">${closeSummary.expectedAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Monto Contado (Real):</span>
+                  <span className="font-bold">${closeSummary.countedCash.toFixed(2)}</span>
+                </div>
+                <div className="pt-3 border-t flex justify-between items-center">
+                  <span className="font-medium">Diferencia:</span>
+                  <span className={cn("font-bold text-lg", closeSummary.difference < 0 ? "text-red-500" : "text-green-600")}>
+                    {closeSummary.difference > 0 ? "+" : ""}${closeSummary.difference.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Dinero Contado Físicamente</label>
+                <NumberInput
+                  value={countedCash}
+                  onValueChange={(val) => setCountedCash(val === undefined ? "" : val)}
+                  placeholder="Ej. 1250.00"
+                  className="text-lg font-bold"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-500">Observaciones (Opcional)</label>
+                <Input
+                  value={closeNotes}
+                  onChange={(e) => setCloseNotes(e.target.value)}
+                  placeholder="Faltaron 2 dólares, billete roto..."
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            {closeSummary ? (
+              <Button
+                onClick={() => {
+                  setShowCloseShiftModal(false);
+                  setCloseSummary(null);
+                  setCountedCash("");
+                  setCloseNotes("");
+                  setShowOpenShiftModal(true); // Requiere abrir de nuevo para vender
+                }}
+                className="w-full"
+              >
+                Entendido
+              </Button>
+            ) : (
+              <Button
+                onClick={handleCloseShift}
+                disabled={loadingShift || countedCash === ""}
+                variant="destructive"
+                className="w-full"
+              >
+                {loadingShift ? "Cerrando..." : "Confirmar Cierre"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Cotización */}
+      <Dialog open={showQuoteModal} onOpenChange={setShowQuoteModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Save className="text-[var(--primary)]" />
+              Guardar Cotización
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción no descontará inventario y generará un documento válido por los días especificados.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Validez (Días)</label>
+              <NumberInput
+                value={quoteValidDays}
+                onValueChange={(val) => setQuoteValidDays(val === undefined ? "" : val)}
+                placeholder="Ej. 15"
+                className="text-lg font-bold"
+              />
+            </div>
+            {selectedCustomer && (
+              <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-sm flex items-center gap-2">
+                <User size={16} /> A nombre de: <b>{selectedCustomer.name}</b>
+              </div>
+            )}
+            {!selectedCustomer && (
+              <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm flex items-center gap-2">
+                <AlertTriangle size={16} /> Cotización a Consumidor Final
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQuoteModal(false)}>Cancelar</Button>
+            <Button
+              onClick={handleSaveQuote}
+              disabled={loading || quoteValidDays === ""}
+              className="gap-2"
+            >
+              Confirmar y Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

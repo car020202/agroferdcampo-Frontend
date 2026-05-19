@@ -175,3 +175,20 @@ export function requestMonthlyReport(year: string, month: string, email: string)
     method: 'GET',
   });
 }
+
+/** Buscar Productos en el Catálogo */
+export async function searchProducts(query: string, page = 1, limit = 10): Promise<any> {
+  const isSearch = !!query;
+  const endpoint = isSearch
+    ? `/catalog/products/search?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`
+    : `/catalog/products?isActive=true&limit=${limit}&page=${page}`;
+
+  const response = await apiRequest<any>(endpoint);
+  
+  // Normalizar respuesta
+  const items = isSearch
+    ? Array.isArray(response) ? response : []
+    : response.data || [];
+    
+  return { data: items };
+}

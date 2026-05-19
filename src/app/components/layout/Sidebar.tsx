@@ -8,12 +8,12 @@ import {
   Package,
   Store,
   Users,
-  Users2,
+  UserCog,
+  Briefcase,
   ShoppingCart,
   FileText,
   Settings,
   TruckIcon,
-  Wallet,
   X,
 } from "lucide-react";
 
@@ -21,16 +21,15 @@ const navLinks = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/pos", icon: ShoppingCart, label: "Punto de Venta" },
   { path: "/sales", icon: FileText, label: "Historial de Ventas" },
+  { path: "/quotes", icon: FileText, label: "Cotizaciones" },
   { path: "/catalog", icon: Store, label: "Catálogo", roles: [1, 2] },
   { path: "/inventory", icon: Package, label: "Inventario" },
+  { path: "/purchases", icon: TruckIcon, label: "Compras a Prov." },
   { path: "/customers", icon: Users, label: "Clientes" },
-  { path: "/users", icon: Users, label: "Usuarios", roles: [1, 2] },
-  { path: "/suppliers", icon: TruckIcon, label: "Proveedores" },
-  { path: "/finance", icon: Wallet, label: "Finanzas" },
-  { path: "/rrhh", icon: Users2, label: "Recursos Humanos", roles: [1, 2, 3] },
+  { path: "/users", icon: UserCog, label: "Usuarios", roles: [1, 2] },
+  { path: "/rrhh", icon: Briefcase, label: "Recursos Humanos", roles: [1, 2, 3] },
   { path: "/reports", icon: FileText, label: "Reportes" },
   { path: "/settings", icon: Settings, label: "Configuración" },
-  { path: "/ui-showcase", icon: LayoutDashboard, label: "UI Showcase" },
 ];
 
 interface SidebarProps {

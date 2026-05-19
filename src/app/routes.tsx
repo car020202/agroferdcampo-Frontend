@@ -9,7 +9,6 @@ import { Dashboard } from "./pages/Dashboard";
 import { POS } from "./pages/POS";
 import { Inventory } from "./pages/Inventory";
 import { Customers } from "./pages/Customers";
-import { Suppliers } from "./pages/Suppliers";
 import { Finance } from "./pages/Finance";
 import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
@@ -19,6 +18,8 @@ import { HumanResources } from "./pages/HumanResources";
 import { Catalog } from "./pages/Catalog";
 import { UIComponentsShowcase } from "./pages/UIComponentsShowcase";
 import { SalesHistory } from "./pages/SalesHistory";
+import { Quotes } from "./pages/Quotes";
+import { Purchases } from "./pages/Purchases";
 
 export const router = createBrowserRouter([
   {
@@ -53,6 +54,10 @@ export const router = createBrowserRouter([
         element: <SalesHistory />,
       },
       {
+        path: "quotes",
+        element: <Quotes />,
+      },
+      {
         path: "catalog",
         element: <Catalog />,
       },
@@ -69,8 +74,8 @@ export const router = createBrowserRouter([
         element: <UsersPage />,
       },
       {
-        path: "suppliers",
-        element: <Suppliers />,
+        path: "purchases",
+        element: <Purchases />,
       },
       {
         path: "finance",
