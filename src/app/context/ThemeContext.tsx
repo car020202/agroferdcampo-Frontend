@@ -72,6 +72,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return (saved as Theme) || 'light';
   });
 
+  const [hasSavedTheme, setHasSavedTheme] = useState<boolean>(() => {
+    return localStorage.getItem(LS_THEME) !== null;
+  });
+
   const [customLightColors, setCustomLightColors] = useState<ColorPalette | null>(
     () => loadJSON<ColorPalette | null>(LS_CUSTOM_LIGHT, null)
   );
@@ -133,7 +137,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const config = await themeApiService.getConfig();
         
         // Actualizar modo
-        if (config.themeMode && config.themeMode !== theme) {
+        if (!hasSavedTheme && config.themeMode && config.themeMode !== theme) {
           setTheme(config.themeMode as Theme);
         }
 
@@ -219,6 +223,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // --- Acciones ---
   const toggleTheme = () => {
+    setHasSavedTheme(true);
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
