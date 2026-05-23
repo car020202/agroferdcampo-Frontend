@@ -1072,7 +1072,7 @@ export function POS() {
             </div>
           </div>
 
-          <DialogFooter className="p-6 pt-0 border-t border-[var(--border)] mt-2 bg-[var(--bg)]/50 flex sm:justify-between w-full">
+          <DialogFooter className="p-6 pt-6 border-t border-[var(--border)] bg-[var(--bg)]/50 flex sm:justify-between w-full">
             <Button
               variant="ghost"
               onClick={() => {
