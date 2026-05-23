@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router";
 import {
   Search,
   Plus,
@@ -27,7 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popove
 import { Calendar } from "../components/ui/calendar";
 import { apiRequest } from "../config/api";
 import { createSale, sendFacturaConsumidor, sendCreditoFiscal } from "../services/sales.service";
-import { cashShiftsService, CashShift } from "../services/cash-shifts.service";
+import { cashShiftsService, CashShift, BillsBreakdown, CoinsBreakdown, OpenShiftPayload, CloseShiftPayload } from "../services/cash-shifts.service";
 import { quotesService } from "../services/quotes.service";
 import { toast } from "sonner";
 import { Badge } from "../components/ui/badge";
@@ -132,10 +133,26 @@ function DatePicker({ date, setDate, placeholder }: DatePickerProps) {
   );
 }
 
+function calcBreakdownTotal(bills: BillsBreakdown, coins: CoinsBreakdown): number {
+  let cents = 0;
+  cents += bills.d100 * 10000;
+  cents += bills.d50  * 5000;
+  cents += bills.d20  * 2000;
+  cents += bills.d10  * 1000;
+  cents += bills.d5   * 500;
+  cents += bills.d1   * 100;
+  cents += coins.c25  * 25;
+  cents += coins.c10  * 10;
+  cents += coins.c5   * 5;
+  cents += coins.c1   * 1;
+  return cents / 100;
+}
+
 let isCheckoutSubmittingGlobal = false;
 let isQuoteSubmittingGlobal = false;
 
 export function POS() {
+  const navigate = useNavigate();
   const isSubmittingRef = useRef(false);
   const checkoutBtnRef = useRef<HTMLButtonElement>(null);
   const quoteBtnRef = useRef<HTMLButtonElement>(null);
@@ -164,11 +181,14 @@ export function POS() {
   const [activeShift, setActiveShift] = useState<CashShift | null>(null);
   const [loadingShift, setLoadingShift] = useState(true);
   const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
-  const [initialAmount, setInitialAmount] = useState<number | "">("");
+  const [openBills, setOpenBills] = useState<BillsBreakdown>({ d100:0, d50:0, d20:0, d10:0, d5:0, d1:0 });
+  const [openCoins, setOpenCoins] = useState<CoinsBreakdown>({ c25:0, c10:0, c5:0, c1:0 });
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
-  const [countedCash, setCountedCash] = useState<number | "">("");
+  const [closeBills, setCloseBills] = useState<BillsBreakdown>({ d100:0, d50:0, d20:0, d10:0, d5:0, d1:0 });
+  const [closeCoins, setCloseCoins] = useState<CoinsBreakdown>({ c25:0, c10:0, c5:0, c1:0 });
   const [closeNotes, setCloseNotes] = useState("");
   const [closeSummary, setCloseSummary] = useState<{ expectedAmount: number; countedCash: number; difference: number } | null>(null);
+  const [closeExpectedTotals, setCloseExpectedTotals] = useState<{ expectedAmount: number; expectedTarjeta: number; expectedTransferencia: number } | null>(null);
 
   // Quote States
   const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -216,15 +236,20 @@ export function POS() {
   };
 
   const handleOpenShift = async () => {
-    if (initialAmount === "" || initialAmount < 0) {
-      toast.error("Ingrese un monto inicial válido");
+    const total = calcBreakdownTotal(openBills, openCoins);
+    if (total <= 0) {
+      toast.error("El desglose debe sumar al menos $0.01");
       return;
     }
+
     try {
       setLoadingShift(true);
-      const shift = await cashShiftsService.openShift(Number(initialAmount));
+      const shift = await cashShiftsService.openShift({ breakdown: { bills: openBills, coins: openCoins } });
       setActiveShift(shift);
       setShowOpenShiftModal(false);
+      // Reset breakdown state
+      setOpenBills({ d100:0, d50:0, d20:0, d10:0, d5:0, d1:0 });
+      setOpenCoins({ c25:0, c10:0, c5:0, c1:0 });
       toast.success("Caja abierta exitosamente");
     } catch (error: any) {
       toast.error(error.message || "Error al abrir caja");
@@ -233,14 +258,31 @@ export function POS() {
     }
   };
 
+  const handleOpenCloseShiftModal = async () => {
+    try {
+      setLoadingShift(true);
+      const totals = await cashShiftsService.getActiveShiftExpectedTotals();
+      setCloseExpectedTotals(totals);
+      setShowCloseShiftModal(true);
+    } catch (error: any) {
+      toast.error("Error al obtener totales esperados");
+    } finally {
+      setLoadingShift(false);
+    }
+  };
+
   const handleCloseShift = async () => {
-    if (countedCash === "" || countedCash < 0) {
-      toast.error("Ingrese el monto contado en caja");
+    const total = calcBreakdownTotal(closeBills, closeCoins);
+    if (total <= 0) {
+      toast.error("El desglose debe sumar al menos $0.01");
       return;
     }
     try {
       setLoadingShift(true);
-      const res = await cashShiftsService.closeShift(Number(countedCash), closeNotes);
+      const res = await cashShiftsService.closeShift({
+        breakdown: { bills: closeBills, coins: closeCoins },
+        notes: closeNotes || undefined,
+      });
       setCloseSummary(res.summary);
       setActiveShift(null);
       toast.success("Caja cerrada exitosamente");
@@ -554,7 +596,7 @@ export function POS() {
             <Button
               variant="outline"
               className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-              onClick={() => setShowCloseShiftModal(true)}
+              onClick={handleOpenCloseShiftModal}
             >
               <Lock size={16} className="mr-2" />
               Cerrar Caja
@@ -924,34 +966,130 @@ export function POS() {
         </div>
       )}
 
-      {/* 2. Modals de Caja */}
-      <Dialog open={showOpenShiftModal} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md [&>button]:hidden">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Unlock className="text-[var(--primary)]" />
-              Apertura de Caja
-            </DialogTitle>
-            <DialogDescription>
-              Para iniciar ventas, debes abrir la caja ingresando el efectivo inicial.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Monto Inicial en Efectivo</label>
-              <NumberInput
-                value={initialAmount}
-                onValueChange={(val) => setInitialAmount(val === undefined ? "" : val)}
-                placeholder="Ej. 50.00"
-                className="text-lg font-bold"
-              />
+      <Dialog 
+        open={showOpenShiftModal} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowOpenShiftModal(false);
+            navigate('/dashboard');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl overflow-hidden p-0">
+          <div className="p-6 pb-4 border-b border-[var(--border)] bg-[var(--bg)]/50">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3 text-2xl font-black text-[var(--text-main)]">
+                <div className="p-2.5 bg-[var(--primary)]/10 rounded-2xl text-[var(--primary)] shadow-sm">
+                  <Unlock size={28} />
+                </div>
+                Apertura de Caja
+              </DialogTitle>
+              <DialogDescription className="text-base font-medium opacity-80 mt-1">
+                Ingresa el efectivo inicial contando los billetes y monedas disponibles en la gaveta.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-6 pt-4 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              {/* BILLETES */}
+              <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-3 mb-5 border-b border-[var(--border)] pb-3">
+                  <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                    <DollarSign size={20} className="stroke-[2.5px]" />
+                  </div>
+                  <h3 className="font-bold text-lg text-[var(--text-main)]">Billetes</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { key: 'd100', label: '$100' },
+                    { key: 'd50',  label: '$50'  },
+                    { key: 'd20',  label: '$20'  },
+                    { key: 'd10',  label: '$10'  },
+                    { key: 'd5',   label: '$5'   },
+                    { key: 'd1',   label: '$1'   },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="space-y-1.5 group">
+                      <label className="text-xs font-bold text-[var(--text-sec)] tracking-wider">{label}</label>
+                      <NumberInput
+                        value={openBills[key as keyof BillsBreakdown]}
+                        onValueChange={(val) =>
+                          setOpenBills(prev => ({ ...prev, [key]: val ?? 0 }))
+                        }
+                        min={0}
+                        max={500}
+                        step={1}
+                        placeholder="0"
+                        className="font-bold text-lg group-focus-within:border-[var(--primary)] transition-colors h-11"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* MONEDAS */}
+              <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-md transition-shadow flex flex-col">
+                <div className="flex items-center gap-3 mb-5 border-b border-[var(--border)] pb-3">
+                  <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
+                    <div className="w-5 h-5 rounded-full border-[2.5px] border-amber-500 flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-amber-500" />
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-lg text-[var(--text-main)]">Monedas</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4 flex-1 content-start">
+                  {[
+                    { key: 'c25', label: '$0.25' },
+                    { key: 'c10', label: '$0.10' },
+                    { key: 'c5',  label: '$0.05' },
+                    { key: 'c1',  label: '$0.01' },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="space-y-1.5 group">
+                      <label className="text-xs font-bold text-[var(--text-sec)] tracking-wider">{label}</label>
+                      <NumberInput
+                        value={openCoins[key as keyof CoinsBreakdown]}
+                        onValueChange={(val) =>
+                          setOpenCoins(prev => ({ ...prev, [key]: val ?? 0 }))
+                        }
+                        min={0}
+                        max={2000}
+                        step={1}
+                        placeholder="0"
+                        className="font-bold text-lg group-focus-within:border-[var(--primary)] transition-colors h-11"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Total calculado */}
+            <div className="flex justify-between items-center rounded-2xl border-2 border-[var(--primary)]/20 bg-[var(--primary)]/5 px-6 py-4 shadow-inner">
+              <span className="text-sm font-bold text-[var(--primary)] uppercase tracking-widest opacity-80">Total Calculado</span>
+              <span className="text-4xl font-black text-[var(--primary)] tracking-tight">
+                ${calcBreakdownTotal(openBills, openCoins).toFixed(2)}
+              </span>
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="p-6 pt-0 border-t border-[var(--border)] mt-2 bg-[var(--bg)]/50 flex sm:justify-between w-full">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowOpenShiftModal(false);
+                navigate('/dashboard');
+              }}
+              className="font-bold text-[var(--text-sec)] hover:bg-slate-100 h-12 px-8"
+            >
+              Cancelar
+            </Button>
             <Button
               onClick={handleOpenShift}
-              disabled={loadingShift || initialAmount === ""}
-              className="w-full text-lg h-12"
+              disabled={
+                loadingShift ||
+                calcBreakdownTotal(openBills, openCoins) <= 0
+              }
+              className="text-lg h-12 px-12 shadow-lg shadow-[var(--primary)]/20"
             >
               {loadingShift ? "Abriendo..." : "Abrir Caja"}
             </Button>
@@ -960,81 +1098,184 @@ export function POS() {
       </Dialog>
 
       <Dialog open={showCloseShiftModal} onOpenChange={(open) => !loadingShift && setShowCloseShiftModal(open)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="text-red-500" />
-              Cierre de Caja
-            </DialogTitle>
-            <DialogDescription>
-              Ingresa el dinero físico contado en la gaveta.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-3xl overflow-hidden p-0">
+          <div className="p-6 pb-4 border-b border-[var(--border)] bg-[var(--bg)]/50">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3 text-2xl font-black text-rose-500">
+                <div className="p-2.5 bg-rose-500/10 rounded-2xl text-rose-500 shadow-sm">
+                  <Lock size={28} />
+                </div>
+                Cierre de Caja
+              </DialogTitle>
+              <DialogDescription className="text-base font-medium opacity-80 mt-1">
+                Cuenta los billetes y monedas en la gaveta para cerrar tu turno.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
           {closeSummary ? (
-            <div className="space-y-4 py-4 animate-in fade-in zoom-in duration-300">
-              <div className="p-4 rounded-xl border bg-slate-50 space-y-3">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Monto Esperado (Sistema):</span>
-                  <span className="font-bold">${closeSummary.expectedAmount.toFixed(2)}</span>
+            <div className="p-6 space-y-4">
+              <div className="p-6 rounded-2xl border bg-slate-50 space-y-4">
+                <div className="flex justify-between items-center text-base">
+                  <span className="text-slate-500 font-medium">Monto Esperado (Sistema):</span>
+                  <span className="font-bold text-xl">${closeSummary.expectedAmount.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Monto Contado (Real):</span>
-                  <span className="font-bold">${closeSummary.countedCash.toFixed(2)}</span>
+                <div className="flex justify-between items-center text-base">
+                  <span className="text-slate-500 font-medium">Monto Contado (Real):</span>
+                  <span className="font-bold text-xl">${closeSummary.countedCash.toFixed(2)}</span>
                 </div>
-                <div className="pt-3 border-t flex justify-between items-center">
-                  <span className="font-medium">Diferencia:</span>
-                  <span className={cn("font-bold text-lg", closeSummary.difference < 0 ? "text-red-500" : "text-green-600")}>
+                <div className="pt-4 border-t flex justify-between items-center">
+                  <span className="font-bold text-lg">Diferencia:</span>
+                  <span className={cn("font-black text-3xl", closeSummary.difference < 0 ? "text-red-500" : "text-emerald-500")}>
                     {closeSummary.difference > 0 ? "+" : ""}${closeSummary.difference.toFixed(2)}
                   </span>
                 </div>
               </div>
+              <DialogFooter className="pt-2">
+                <Button
+                  onClick={() => {
+                    setShowCloseShiftModal(false);
+                    setCloseSummary(null);
+                    setCloseBills({ d100:0, d50:0, d20:0, d10:0, d5:0, d1:0 });
+                    setCloseCoins({ c25:0, c10:0, c5:0, c1:0 });
+                    setCloseNotes("");
+                    setShowOpenShiftModal(true);
+                  }}
+                  className="w-full text-lg h-12"
+                >
+                  Entendido
+                </Button>
+              </DialogFooter>
             </div>
           ) : (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Dinero Contado Físicamente</label>
-                <NumberInput
-                  value={countedCash}
-                  onValueChange={(val) => setCountedCash(val === undefined ? "" : val)}
-                  placeholder="Ej. 1250.00"
-                  className="text-lg font-bold"
-                />
+            <div className="p-6 pt-4 space-y-6">
+              {closeExpectedTotals && (
+                <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 grid grid-cols-3 gap-6 shadow-sm text-center">
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-blue-600/70 font-bold uppercase tracking-widest mb-1.5">Efectivo Esperado</span>
+                    <span className="text-2xl font-black text-blue-700">${closeExpectedTotals.expectedAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-blue-600/70 font-bold uppercase tracking-widest mb-1.5">Tarjeta</span>
+                    <span className="text-2xl font-black text-blue-700">${closeExpectedTotals.expectedTarjeta.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-blue-600/70 font-bold uppercase tracking-widest mb-1.5">Transferencia</span>
+                    <span className="text-2xl font-black text-blue-700">${closeExpectedTotals.expectedTransferencia.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                {/* BILLETES */}
+                <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-3 mb-5 border-b border-[var(--border)] pb-3">
+                    <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                      <DollarSign size={20} className="stroke-[2.5px]" />
+                    </div>
+                    <h3 className="font-bold text-lg text-[var(--text-main)]">Billetes</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { key: 'd100', label: '$100' },
+                      { key: 'd50',  label: '$50'  },
+                      { key: 'd20',  label: '$20'  },
+                      { key: 'd10',  label: '$10'  },
+                      { key: 'd5',   label: '$5'   },
+                      { key: 'd1',   label: '$1'   },
+                    ].map(({ key, label }) => (
+                      <div key={key} className="space-y-1.5 group">
+                        <label className="text-xs font-bold text-[var(--text-sec)] tracking-wider">{label}</label>
+                        <NumberInput
+                          value={closeBills[key as keyof BillsBreakdown]}
+                          onValueChange={(val) =>
+                            setCloseBills(prev => ({ ...prev, [key]: val ?? 0 }))
+                          }
+                          min={0}
+                          max={500}
+                          step={1}
+                          placeholder="0"
+                          className="font-bold text-lg group-focus-within:border-[var(--primary)] transition-colors h-11"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* MONEDAS */}
+                <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-md transition-shadow flex flex-col">
+                  <div className="flex items-center gap-3 mb-5 border-b border-[var(--border)] pb-3">
+                    <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
+                      <div className="w-5 h-5 rounded-full border-[2.5px] border-amber-500 flex items-center justify-center">
+                        <div className="w-2 h-2 rounded-full bg-amber-500" />
+                      </div>
+                    </div>
+                    <h3 className="font-bold text-lg text-[var(--text-main)]">Monedas</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 flex-1 content-start">
+                    {[
+                      { key: 'c25', label: '$0.25' },
+                      { key: 'c10', label: '$0.10' },
+                      { key: 'c5',  label: '$0.05' },
+                      { key: 'c1',  label: '$0.01' },
+                    ].map(({ key, label }) => (
+                      <div key={key} className="space-y-1.5 group">
+                        <label className="text-xs font-bold text-[var(--text-sec)] tracking-wider">{label}</label>
+                        <NumberInput
+                          value={closeCoins[key as keyof CoinsBreakdown]}
+                          onValueChange={(val) =>
+                            setCloseCoins(prev => ({ ...prev, [key]: val ?? 0 }))
+                          }
+                          min={0}
+                          max={2000}
+                          step={1}
+                          placeholder="0"
+                          className="font-bold text-lg group-focus-within:border-[var(--primary)] transition-colors h-11"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-500">Observaciones (Opcional)</label>
-                <Input
-                  value={closeNotes}
-                  onChange={(e) => setCloseNotes(e.target.value)}
-                  placeholder="Faltaron 2 dólares, billete roto..."
-                />
+
+              {/* Total y Observaciones */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div className="space-y-2 h-full flex flex-col justify-end">
+                  <label className="text-sm font-bold text-slate-500 uppercase tracking-widest">Observaciones (Opcional)</label>
+                  <Input
+                    value={closeNotes}
+                    onChange={(e) => setCloseNotes(e.target.value)}
+                    placeholder="Ej. Billete roto..."
+                    className="h-[72px] rounded-2xl text-base px-4"
+                  />
+                </div>
+                <div className="flex justify-between items-center rounded-2xl border-2 border-rose-500/20 bg-rose-500/5 px-6 h-[72px] shadow-inner">
+                  <span className="text-sm font-bold text-rose-500 uppercase tracking-widest opacity-80">Total Contado</span>
+                  <span className="text-4xl font-black text-rose-500 tracking-tight">
+                    ${calcBreakdownTotal(closeBills, closeCoins).toFixed(2)}
+                  </span>
+                </div>
               </div>
+
+              <DialogFooter className="pt-4 border-t border-[var(--border)] flex sm:justify-between w-full">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowCloseShiftModal(false)}
+                  className="font-bold text-[var(--text-sec)] hover:bg-slate-100 h-12 px-8"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleCloseShift}
+                  disabled={loadingShift || calcBreakdownTotal(closeBills, closeCoins) <= 0}
+                  variant="destructive"
+                  className="text-lg h-12 px-12 shadow-lg shadow-rose-500/20"
+                >
+                  {loadingShift ? "Cerrando..." : "Confirmar Cierre"}
+                </Button>
+              </DialogFooter>
             </div>
           )}
-          <DialogFooter>
-            {closeSummary ? (
-              <Button
-                onClick={() => {
-                  setShowCloseShiftModal(false);
-                  setCloseSummary(null);
-                  setCountedCash("");
-                  setCloseNotes("");
-                  setShowOpenShiftModal(true); // Requiere abrir de nuevo para vender
-                }}
-                className="w-full"
-              >
-                Entendido
-              </Button>
-            ) : (
-              <Button
-                onClick={handleCloseShift}
-                disabled={loadingShift || countedCash === ""}
-                variant="destructive"
-                className="w-full"
-              >
-                {loadingShift ? "Cerrando..." : "Confirmar Cierre"}
-              </Button>
-            )}
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
