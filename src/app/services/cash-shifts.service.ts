@@ -13,6 +13,7 @@ export interface CashShift {
   expectedAmount: number | null;
   countedCash: number | null;
   difference: number | null;
+  openingNotes: string | null;
   notes: string | null;
   status: 'ABIERTO' | 'CERRADO';
 }
@@ -43,6 +44,7 @@ export interface DenominationBreakdown {
 
 export interface OpenShiftPayload {
   breakdown: DenominationBreakdown;
+  notes?: string;
 }
 
 export interface CloseShiftPayload {

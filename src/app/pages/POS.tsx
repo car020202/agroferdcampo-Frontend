@@ -193,6 +193,7 @@ export function POS() {
   const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
   const [openBills, setOpenBills] = useState<BillsBreakdown>({ d100:0, d50:0, d20:0, d10:0, d5:0, d1:0 });
   const [openCoins, setOpenCoins] = useState<CoinsBreakdown>({ c25:0, c10:0, c5:0, c1:0 });
+  const [openNotes, setOpenNotes] = useState("");
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
   const [closeBills, setCloseBills] = useState<BillsBreakdown>({ d100:0, d50:0, d20:0, d10:0, d5:0, d1:0 });
   const [closeCoins, setCloseCoins] = useState<CoinsBreakdown>({ c25:0, c10:0, c5:0, c1:0 });
@@ -285,12 +286,16 @@ export function POS() {
 
     try {
       setLoadingShift(true);
-      const shift = await cashShiftsService.openShift({ breakdown: { bills: openBills, coins: openCoins } });
+      const shift = await cashShiftsService.openShift({ 
+        breakdown: { bills: openBills, coins: openCoins },
+        notes: openNotes || undefined
+      });
       setActiveShift(shift);
       setShowOpenShiftModal(false);
       // Reset breakdown state
       setOpenBills({ d100:0, d50:0, d20:0, d10:0, d5:0, d1:0 });
       setOpenCoins({ c25:0, c10:0, c5:0, c1:0 });
+      setOpenNotes("");
       toast.success("Caja abierta exitosamente");
     } catch (error: any) {
       toast.error(error.message || "Error al abrir caja");
@@ -1085,12 +1090,23 @@ export function POS() {
               </div>
             </div>
 
-            {/* Total calculado */}
-            <div className="flex flex-col sm:flex-row justify-between items-center sm:items-center rounded-2xl border-2 border-[var(--primary)]/20 bg-[var(--primary)]/5 px-4 sm:px-6 py-4 shadow-inner gap-2 sm:gap-0">
-              <span className="text-xs sm:text-sm font-bold text-[var(--primary)] uppercase tracking-widest opacity-80">Total Calculado</span>
-              <span className="text-3xl sm:text-4xl font-black text-[var(--primary)] tracking-tight">
-                ${calcBreakdownTotal(openBills, openCoins).toFixed(2)}
-              </span>
+            {/* Total calculado y Observaciones */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-end mt-4">
+              <div className="space-y-2 h-full flex flex-col justify-end">
+                <label className="text-xs sm:text-sm font-bold text-[var(--text-sec)] uppercase tracking-widest">Observaciones (Opcional)</label>
+                <Input
+                  value={openNotes}
+                  onChange={(e) => setOpenNotes(e.target.value)}
+                  placeholder="Ej. Sencillo incompleto..."
+                  className="h-12 sm:h-[72px] rounded-xl sm:rounded-2xl text-sm sm:text-base px-4"
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row justify-center sm:justify-between items-center rounded-xl sm:rounded-2xl border-2 border-[var(--primary)]/20 bg-[var(--primary)]/5 px-4 sm:px-6 py-3 sm:py-0 sm:h-[72px] shadow-inner gap-1 sm:gap-0">
+                <span className="text-[10px] sm:text-sm font-bold text-[var(--primary)] uppercase tracking-widest opacity-80">Total Calculado</span>
+                <span className="text-3xl sm:text-4xl font-black text-[var(--primary)] tracking-tight">
+                  ${calcBreakdownTotal(openBills, openCoins).toFixed(2)}
+                </span>
+              </div>
             </div>
           </div>
 

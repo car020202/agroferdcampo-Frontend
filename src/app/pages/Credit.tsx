@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { creditService, CreditSale, CreditSummary, CreditPayment, RegisterPaymentDto } from '../services/credit.service';
+import { creditService, CreditSale, CreditSummary, CreditPayment, RegisterPaymentDto, GroupedCreditCustomer } from '../services/credit.service';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
@@ -21,7 +21,7 @@ let isAbonoSubmittingGlobal = false;
 export function Credit() {
   const isSubmittingRef = useRef(false);
   const submitBtnRef = useRef<HTMLButtonElement>(null);
-  const [credits, setCredits] = useState<CreditSale[]>([]);
+  const [groupedCredits, setGroupedCredits] = useState<GroupedCreditCustomer[]>([]);
   const [summary, setSummary] = useState<CreditSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
@@ -30,8 +30,22 @@ export function Credit() {
   const [statusFilter, setStatusFilter] = useState('all');
   
   // Modals
-  const [selectedCredit, setSelectedCredit] = useState<CreditSale | null>(null);
-  const [payments, setPayments] = useState<CreditPayment[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<GroupedCreditCustomer | null>(null);
+  const [selectedCreditForPayment, setSelectedCreditForPayment] = useState<CreditSale | null>(null);
+  
+  // Specific Sale Detail
+  const [specificDetailModalOpen, setSpecificDetailModalOpen] = useState(false);
+  const [selectedSpecificCredit, setSelectedSpecificCredit] = useState<CreditSale | null>(null);
+  const [specificPayments, setSpecificPayments] = useState<CreditPayment[]>([]);
+  const [specificPaymentsPage, setSpecificPaymentsPage] = useState(1);
+
+  // Inner Modal Filters
+  const [innerStatusFilter, setInnerStatusFilter] = useState('all');
+  const [innerBuyDateStart, setInnerBuyDateStart] = useState('');
+  const [innerBuyDateEnd, setInnerBuyDateEnd] = useState('');
+  const [innerDueDateStart, setInnerDueDateStart] = useState('');
+  const [innerDueDateEnd, setInnerDueDateEnd] = useState('');
+
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   
@@ -70,8 +84,8 @@ export function Credit() {
       const filters: any = { page: pagination.page, limit: pagination.limit };
       if (statusFilter !== 'all') filters.status = statusFilter;
 
-      const res = await creditService.getCredits(filters);
-      setCredits(res.data || []);
+      const res = await creditService.getGroupedCredits(filters);
+      setGroupedCredits(res.data || []);
       setPagination({
         page: res.page || 1,
         limit: res.limit || 20,
@@ -85,13 +99,23 @@ export function Credit() {
     }
   };
 
-  const handleOpenDetail = async (credit: CreditSale) => {
+  const handleOpenDetail = (group: GroupedCreditCustomer) => {
+    setSelectedGroup(group);
+    setInnerStatusFilter('all');
+    setInnerBuyDateStart('');
+    setInnerBuyDateEnd('');
+    setInnerDueDateStart('');
+    setInnerDueDateEnd('');
+    setDetailModalOpen(true);
+  };
+
+  const handleOpenSpecificDetail = async (sale: CreditSale) => {
     try {
-      const fullCredit = await creditService.getCreditDetail(credit.id);
-      const creditPayments = await creditService.getPayments(credit.id);
-      setSelectedCredit(fullCredit);
-      setPayments(Array.isArray(creditPayments) ? creditPayments : []);
-      setDetailModalOpen(true);
+      const creditPayments = await creditService.getPayments(sale.id);
+      setSelectedSpecificCredit(sale);
+      setSpecificPayments(Array.isArray(creditPayments) ? creditPayments : []);
+      setSpecificPaymentsPage(1);
+      setSpecificDetailModalOpen(true);
     } catch (e) {
       toast.error('Error al cargar detalle del crédito');
     }
@@ -99,7 +123,7 @@ export function Credit() {
 
   const handleOpenPayment = (credit: CreditSale) => {
     const remaining = Number(credit.remainingAmount) || 0;
-    setSelectedCredit(credit);
+    setSelectedCreditForPayment(credit);
     setPaymentForm({
       amount: remaining,
       paymentMethod: 'EFECTIVO',
@@ -110,11 +134,11 @@ export function Credit() {
   };
 
   const handlePaymentSubmit = async () => {
-    if (!selectedCredit) return;
+    if (!selectedCreditForPayment) return;
     if (isAbonoSubmittingGlobal) return;
     
     const amount = Number(paymentForm.amount);
-    const maxAmount = Number(selectedCredit.remainingAmount) || 0;
+    const maxAmount = Number(selectedCreditForPayment.remainingAmount) || 0;
     if (amount <= 0 || amount > maxAmount) {
       toast.error(`El monto debe ser mayor a 0 y no puede exceder $${maxAmount.toFixed(2)}`);
       return;
@@ -131,12 +155,37 @@ export function Credit() {
     
     setSavingPayment(true);
     try {
-      await creditService.registerPayment(selectedCredit.id, {
+      await creditService.registerPayment(selectedCreditForPayment.id, {
         ...paymentForm,
         amount,
       });
       toast.success('Abono registrado correctamente');
       setPaymentModalOpen(false);
+      
+      // Update selectedGroup dynamically to reflect new balances without closing modal
+      if (selectedGroup) {
+        const updatedSales = selectedGroup.creditSales.map(s => {
+          if (s.id === selectedCreditForPayment.id) {
+            const paid = Number(s.paidAmount) + amount;
+            const remain = Number(s.remainingAmount) - amount;
+            return {
+              ...s,
+              paidAmount: paid,
+              remainingAmount: remain,
+              status: remain <= 0 ? 'PAGADO' : s.status
+            };
+          }
+          return s;
+        }) as CreditSale[];
+        
+        setSelectedGroup({
+          ...selectedGroup,
+          creditSales: updatedSales,
+          totalPaid: selectedGroup.totalPaid + amount,
+          totalRemaining: selectedGroup.totalRemaining - amount,
+        });
+      }
+
       fetchSummary();
       fetchCredits();
     } catch (e: any) {
@@ -165,7 +214,31 @@ export function Credit() {
     }
   };
 
-  const remaining = Number(selectedCredit?.remainingAmount) || 0;
+  const remaining = Number(selectedCreditForPayment?.remainingAmount) || 0;
+
+  const filteredInnerSales = selectedGroup?.creditSales.filter(s => {
+    if (innerStatusFilter !== 'all' && s.status !== innerStatusFilter) return false;
+    
+    if (innerBuyDateStart || innerBuyDateEnd) {
+      const buyDate = new Date(s.createdAt);
+      if (innerBuyDateStart && buyDate < new Date(innerBuyDateStart)) return false;
+      if (innerBuyDateEnd && buyDate > new Date(new Date(innerBuyDateEnd).setHours(23, 59, 59))) return false;
+    }
+    
+    if (innerDueDateStart || innerDueDateEnd) {
+      const dueDate = s.dueDate ? new Date(s.dueDate) : new Date(new Date(s.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000);
+      if (innerDueDateStart && dueDate < new Date(innerDueDateStart)) return false;
+      if (innerDueDateEnd && dueDate > new Date(new Date(innerDueDateEnd).setHours(23, 59, 59))) return false;
+    }
+    return true;
+  }) || [];
+
+  const itemsPerPage = 10;
+  const specificPaymentsTotalPages = Math.ceil(specificPayments.length / itemsPerPage);
+  const currentSpecificPayments = specificPayments.slice(
+    (specificPaymentsPage - 1) * itemsPerPage,
+    specificPaymentsPage * itemsPerPage
+  );
 
   return (
     <div className="flex flex-col gap-6 h-full">
@@ -223,12 +296,11 @@ export function Credit() {
             <TableHeader>
               <TableRow>
                 <TableHead>Cliente</TableHead>
-                <TableHead>Venta Ref.</TableHead>
-                <TableHead>Vencimiento</TableHead>
+                <TableHead>Vencimiento Próximo</TableHead>
                 <TableHead className="text-right">Total Original</TableHead>
                 <TableHead className="text-right">Abonado</TableHead>
                 <TableHead className="text-right">Saldo Restante</TableHead>
-                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-center">Estado General</TableHead>
                 <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -239,60 +311,49 @@ export function Credit() {
                     Cargando cartera...
                   </TableCell>
                 </TableRow>
-              ) : credits.length === 0 ? (
+              ) : groupedCredits.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-[var(--text-sec)] font-medium">
+                  <TableCell colSpan={7} className="h-32 text-center text-[var(--text-sec)] font-medium">
                     No se encontraron créditos con estos filtros
                   </TableCell>
                 </TableRow>
               ) : (
-                credits.map(credit => (
-                  <TableRow key={credit.id} className="group hover:bg-[var(--bg)]/30">
+                groupedCredits.map(group => (
+                  <TableRow key={group.customer.id} className="group hover:bg-[var(--bg)]/30">
                     <TableCell>
                       <span className="font-bold text-[var(--text-main)] block">
-                        {credit.customer?.name ?? `Cliente #${credit.customerId}`}
+                        {group.customer.name}
+                      </span>
+                      <span className="text-xs text-[var(--text-sec)] block mt-0.5">
+                        {group.creditSales.length} {group.creditSales.length === 1 ? 'compra' : 'compras'}
                       </span>
                     </TableCell>
-                    <TableCell className="text-sm font-medium">
-                      Venta #{credit.saleId}
-                      <br/>
-                      <span className="text-xs text-[var(--text-sec)]">{new Date(credit.createdAt).toLocaleDateString()}</span>
-                    </TableCell>
                     <TableCell className="text-sm">
-                      {(() => {
-                        const dateToUse = credit.dueDate 
-                          ? new Date(credit.dueDate) 
-                          : new Date(new Date(credit.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000);
-                        const isOverdue = dateToUse < new Date() && credit.status !== 'PAGADO';
-                        return (
-                          <span className={isOverdue ? 'text-rose-500 font-bold' : ''}>
-                            {dateToUse.toLocaleDateString()}
-                          </span>
-                        );
-                      })()}
+                      {group.nearestDueDate ? (
+                        <span className={group.status === 'VENCIDO' ? 'text-rose-500 font-bold' : ''}>
+                          {new Date(group.nearestDueDate).toLocaleDateString()}
+                        </span>
+                      ) : (
+                        <span className="text-[var(--text-sec)]">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      ${Number(credit.originalAmount).toFixed(2)}
+                      ${Number(group.totalDebt).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right font-medium text-emerald-600">
-                      ${Number(credit.paidAmount).toFixed(2)}
+                      ${Number(group.totalPaid).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right font-black text-[var(--primary)]">
-                      ${Number(credit.remainingAmount).toFixed(2)}
+                      ${Number(group.totalRemaining).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
-                      {getStatusBadge(credit.status)}
+                      {getStatusBadge(group.status)}
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenDetail(credit)} className="text-[var(--primary)] hover:bg-[var(--primary)]/10">
-                          <Eye size={18} />
+                        <Button variant="ghost" size="sm" onClick={() => handleOpenDetail(group)} className="text-[var(--primary)] hover:bg-[var(--primary)]/10">
+                          <Eye size={16} className="mr-1.5" /> Ver Detalle
                         </Button>
-                        {credit.status !== 'PAGADO' && credit.status !== 'ANULADO' && (
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenPayment(credit)} className="text-emerald-600 hover:bg-emerald-600/10" title="Registrar Abono">
-                            <Plus size={18} />
-                          </Button>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -327,68 +388,139 @@ export function Credit() {
         )}
       </div>
 
-      {/* DETALLE DEL CRÉDITO Y ABONOS */}
+      {/* DETALLE DEL CLIENTE Y FACTURAS */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="sm:max-w-4xl w-full flex flex-col p-0">
-          {selectedCredit && (
+        <DialogContent className="sm:max-w-5xl w-full flex flex-col p-0 max-h-[90vh]">
+          {selectedGroup && (
             <>
-              <DialogHeader className="p-6 pr-16 border-b">
+              <DialogHeader className="p-6 pr-16 border-b shrink-0 bg-[var(--bg)]/50">
                 <DialogTitle className="flex items-center justify-between">
-                  <span>Crédito #{selectedCredit.id} — Venta #{selectedCredit.saleId}</span>
-                  {getStatusBadge(selectedCredit.status)}
+                  <span className="text-xl font-black">{selectedGroup.customer.name}</span>
+                  {getStatusBadge(selectedGroup.status)}
                 </DialogTitle>
                 <DialogDescription>
-                  Cliente: {selectedCredit.customer?.name ?? `#${selectedCredit.customerId}`}
+                  Resumen de cuenta y facturas pendientes.
                 </DialogDescription>
               </DialogHeader>
-              <div className="p-6 overflow-y-auto space-y-6">
+              <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-[var(--bg)] p-4 rounded-xl border">
                     <p className="text-xs font-bold text-[var(--text-sec)] uppercase">Total Deuda</p>
-                    <p className="text-lg font-bold">${Number(selectedCredit.originalAmount).toFixed(2)}</p>
+                    <p className="text-lg font-bold">${Number(selectedGroup.totalDebt).toFixed(2)}</p>
                   </div>
                   <div className="bg-emerald-500/10 dark:bg-emerald-500/20 p-4 rounded-xl border border-emerald-500/20 dark:border-emerald-500/30">
                     <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase">Abonado</p>
-                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">${Number(selectedCredit.paidAmount).toFixed(2)}</p>
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">${Number(selectedGroup.totalPaid).toFixed(2)}</p>
                   </div>
                   <div className="bg-[var(--primary)]/10 p-4 rounded-xl border border-[var(--primary)]/20">
                     <p className="text-xs font-bold text-[var(--primary)] uppercase">Saldo Pendiente</p>
-                    <p className="text-lg font-black text-[var(--primary)]">${Number(selectedCredit.remainingAmount).toFixed(2)}</p>
+                    <p className="text-lg font-black text-[var(--primary)]">${Number(selectedGroup.totalRemaining).toFixed(2)}</p>
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><History size={18}/> Historial de Abonos</h3>
-                  <div className="border rounded-xl overflow-hidden">
+                <div className="flex flex-col gap-4 mb-4">
+                  <h3 className="font-bold text-lg flex items-center gap-2"><History size={18}/> Compras a Crédito</h3>
+                  
+                  {/* Filtros Internos */}
+                  <div className="flex flex-wrap gap-3 bg-[var(--bg)] p-3 rounded-xl border border-[var(--border)]">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] uppercase font-bold text-[var(--text-sec)]">Estado</Label>
+                      <Select value={innerStatusFilter} onValueChange={setInnerStatusFilter}>
+                        <SelectTrigger className="h-8 text-xs bg-[var(--card)] min-w-[120px]">
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="PENDIENTE">Pendiente</SelectItem>
+                          <SelectItem value="VENCIDO">Vencido</SelectItem>
+                          <SelectItem value="PAGADO">Pagado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] uppercase font-bold text-[var(--text-sec)]">Fecha Compra (Desde)</Label>
+                      <Input type="date" className="h-8 text-xs bg-[var(--card)]" value={innerBuyDateStart} onChange={e => setInnerBuyDateStart(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] uppercase font-bold text-[var(--text-sec)]">Fecha Compra (Hasta)</Label>
+                      <Input type="date" className="h-8 text-xs bg-[var(--card)]" value={innerBuyDateEnd} onChange={e => setInnerBuyDateEnd(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] uppercase font-bold text-[var(--text-sec)]">Vencimiento (Desde)</Label>
+                      <Input type="date" className="h-8 text-xs bg-[var(--card)]" value={innerDueDateStart} onChange={e => setInnerDueDateStart(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] uppercase font-bold text-[var(--text-sec)]">Vencimiento (Hasta)</Label>
+                      <Input type="date" className="h-8 text-xs bg-[var(--card)]" value={innerDueDateEnd} onChange={e => setInnerDueDateEnd(e.target.value)} />
+                    </div>
+                    {(innerStatusFilter !== 'all' || innerBuyDateStart || innerBuyDateEnd || innerDueDateStart || innerDueDateEnd) && (
+                      <div className="space-y-1 flex items-end">
+                        <Button 
+                          variant="ghost" size="sm" className="h-8 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                          onClick={() => {
+                            setInnerStatusFilter('all'); setInnerBuyDateStart(''); setInnerBuyDateEnd(''); setInnerDueDateStart(''); setInnerDueDateEnd('');
+                          }}
+                        >
+                          Limpiar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border rounded-xl overflow-hidden shadow-sm bg-[var(--card)]">
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead>Ref. Venta</TableHead>
                           <TableHead>Fecha</TableHead>
-                          <TableHead>Método</TableHead>
-                          <TableHead>Referencia</TableHead>
-                          <TableHead>Registrado por</TableHead>
-                          <TableHead className="text-right">Monto</TableHead>
+                          <TableHead>Vencimiento</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead className="text-right">Abonado</TableHead>
+                          <TableHead className="text-right">Restante</TableHead>
+                          <TableHead className="text-center">Estado</TableHead>
+                          <TableHead className="text-center">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {payments.length === 0 ? (
+                        {filteredInnerSales.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                              No hay abonos registrados
+                            <TableCell colSpan={8} className="text-center py-6 text-[var(--text-sec)]">
+                              No hay compras que coincidan con los filtros
                             </TableCell>
                           </TableRow>
                         ) : (
-                          payments.map(p => (
-                            <TableRow key={p.id}>
-                              <TableCell>{new Date(p.createdAt).toLocaleString()}</TableCell>
-                              <TableCell>{p.paymentMethod}</TableCell>
-                              <TableCell>{p.reference || '-'}</TableCell>
-                              <TableCell>{p.user?.fullName || '-'}</TableCell>
-                              <TableCell className="text-right font-bold text-emerald-600">
-                                ${Number(p.amount).toFixed(2)}
-                              </TableCell>
-                            </TableRow>
-                          ))
+                          filteredInnerSales.map(s => {
+                            const dateToUse = s.dueDate 
+                              ? new Date(s.dueDate) 
+                              : new Date(new Date(s.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000);
+                            const isOverdue = dateToUse < new Date() && s.status !== 'PAGADO';
+                            
+                            return (
+                              <TableRow key={s.id}>
+                                <TableCell className="font-bold">Venta #{s.saleId}</TableCell>
+                                <TableCell>{new Date(s.createdAt).toLocaleDateString()}</TableCell>
+                                <TableCell className={isOverdue ? 'text-rose-500 font-bold' : ''}>
+                                  {dateToUse.toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className="text-right">${Number(s.originalAmount).toFixed(2)}</TableCell>
+                                <TableCell className="text-right text-emerald-600">${Number(s.paidAmount).toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-bold text-[var(--primary)]">${Number(s.remainingAmount).toFixed(2)}</TableCell>
+                                <TableCell className="text-center">{getStatusBadge(s.status)}</TableCell>
+                                <TableCell className="text-center">
+                                  <div className="flex justify-center gap-1">
+                                    <Button variant="ghost" size="icon" onClick={() => handleOpenSpecificDetail(s)} className="text-[var(--primary)] hover:bg-[var(--primary)]/10" title="Ver Historial de Abonos">
+                                      <Eye size={16} />
+                                    </Button>
+                                    {s.status !== 'PAGADO' && s.status !== 'ANULADO' && (
+                                      <Button variant="ghost" size="icon" onClick={() => handleOpenPayment(s)} className="text-emerald-600 hover:bg-emerald-600/10" title="Abonar">
+                                        <Plus size={16} />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
                         )}
                       </TableBody>
                     </Table>
@@ -406,7 +538,7 @@ export function Credit() {
           <DialogHeader>
             <DialogTitle>Registrar Abono</DialogTitle>
             <DialogDescription>
-              {selectedCredit?.customer?.name ?? `Cliente #${selectedCredit?.customerId}`} — Saldo: ${remaining.toFixed(2)}
+              {selectedGroup?.customer?.name ?? `Cliente #${selectedCreditForPayment?.customerId}`} — Venta #{selectedCreditForPayment?.saleId} — Saldo: ${remaining.toFixed(2)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -465,6 +597,87 @@ export function Credit() {
               {savingPayment ? 'Registrando...' : 'Confirmar Abono'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DETALLE DE FACTURA ESPECÍFICA (HISTORIAL DE ABONOS) */}
+      <Dialog open={specificDetailModalOpen} onOpenChange={setSpecificDetailModalOpen}>
+        <DialogContent className="sm:max-w-3xl w-full flex flex-col p-0">
+          {selectedSpecificCredit && (
+            <>
+              <DialogHeader className="p-6 pr-16 border-b">
+                <DialogTitle className="flex items-center justify-between">
+                  <span>Venta #{selectedSpecificCredit.saleId}</span>
+                  {getStatusBadge(selectedSpecificCredit.status)}
+                </DialogTitle>
+                <DialogDescription>
+                  Historial de abonos para esta compra.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="p-6 overflow-y-auto space-y-6">
+                <div>
+                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><History size={18}/> Historial de Abonos</h3>
+                  <div className="border rounded-xl overflow-hidden shadow-sm bg-[var(--card)]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Método</TableHead>
+                          <TableHead>Referencia</TableHead>
+                          <TableHead>Registrado por</TableHead>
+                          <TableHead className="text-right">Monto</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {specificPayments.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                              No hay abonos registrados
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          currentSpecificPayments.map(p => (
+                            <TableRow key={p.id}>
+                              <TableCell>{new Date(p.createdAt).toLocaleString()}</TableCell>
+                              <TableCell>{p.paymentMethod}</TableCell>
+                              <TableCell>{p.reference || '-'}</TableCell>
+                              <TableCell>{p.user?.fullName || '-'}</TableCell>
+                              <TableCell className="text-right font-bold text-emerald-600">
+                                ${Number(p.amount).toFixed(2)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                    {specificPaymentsTotalPages > 1 && (
+                      <div className="p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg)]/5">
+                        <p className="text-xs font-bold text-[var(--text-sec)]">
+                          Página {specificPaymentsPage} de {specificPaymentsTotalPages} ({specificPayments.length} abonos)
+                        </p>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" size="sm" 
+                            disabled={specificPaymentsPage === 1}
+                            onClick={() => setSpecificPaymentsPage(p => p - 1)}
+                          >
+                            Anterior
+                          </Button>
+                          <Button 
+                            variant="outline" size="sm" 
+                            disabled={specificPaymentsPage === specificPaymentsTotalPages}
+                            onClick={() => setSpecificPaymentsPage(p => p + 1)}
+                          >
+                            Siguiente
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

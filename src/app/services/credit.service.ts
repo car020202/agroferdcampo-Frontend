@@ -44,6 +44,21 @@ export interface CreditSale {
   payments?: CreditPayment[];
 }
 
+export interface GroupedCreditCustomer {
+  customer: {
+    id: number;
+    name: string;
+    creditLimit: string | number;
+    creditBalance: string | number;
+  };
+  creditSales: CreditSale[];
+  totalDebt: number;
+  totalPaid: number;
+  totalRemaining: number;
+  nearestDueDate: string | null;
+  status: 'PENDIENTE' | 'VENCIDO' | 'PAGADO' | 'ANULADO';
+}
+
 export interface RegisterPaymentDto {
   amount: number;
   paymentMethod: string;
@@ -62,6 +77,18 @@ export const creditService = {
       });
     }
     return apiRequest<any>(`/credit?${query.toString()}`);
+  },
+
+  getGroupedCredits: (params?: { page?: number; limit?: number; status?: string }) => {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') {
+          query.append(key, String(value));
+        }
+      });
+    }
+    return apiRequest<any>(`/credit/grouped?${query.toString()}`);
   },
 
   getSummary: () => {
