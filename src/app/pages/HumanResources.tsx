@@ -48,6 +48,8 @@ import {
   TabsTrigger,
 } from "../components/ui/tabs";
 import { toast } from "sonner";
+import { Switch } from "../components/ui/switch";
+import { InlinePills } from "../components/ui/inline-pills";
 import { cn } from "../components/ui/utils";
 import {
   Dialog,
@@ -737,8 +739,8 @@ export function HumanResources() {
 
         {/* --- TAB: RESUMEN --- */}
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[
+          <InlinePills
+            metrics={[
               {
                 label: "Total Activos",
                 value: stats?.totalActive || 0,
@@ -763,28 +765,8 @@ export function HumanResources() {
                 icon: CalendarIcon,
                 color: "#10b981",
               },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <Card
-                key={label}
-                className="px-5 py-4 flex items-center justify-between border-[var(--border)] bg-[var(--card)] shadow-sm hover:shadow-md transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="p-2 rounded-lg"
-                    style={{ backgroundColor: `${color}15`, color }}
-                  >
-                    <Icon size={18} />
-                  </div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-sec)]">
-                    {label}
-                  </p>
-                </div>
-                <p className="text-xl font-black text-[var(--text-main)]">
-                  {value}
-                </p>
-              </Card>
-            ))}
-          </div>
+            ]}
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="p-6 border-[var(--border)] bg-[var(--card)] shadow-sm">

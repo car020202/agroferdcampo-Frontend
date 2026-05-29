@@ -11,6 +11,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { StateCards } from '../components/ui/state-cards';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
@@ -305,35 +306,35 @@ export function DeliveryNotes() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 border-[var(--border)] bg-[var(--card)] flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-[var(--text-sec)] uppercase">Total Documentos</p>
-            <p className="text-2xl font-black">{stats.total || 0}</p>
-          </div>
-          <div className="p-3 bg-blue-100 text-blue-600 rounded-xl dark:bg-blue-900/30"><BarChart3 size={20}/></div>
-        </Card>
-        <Card className="p-4 border-[var(--border)] bg-[var(--card)] flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-[var(--text-sec)] uppercase">Emitidos Pendientes</p>
-            <p className="text-2xl font-black text-amber-600">{stats.emitidos || 0}</p>
-          </div>
-          <div className="p-3 bg-amber-100 text-amber-600 rounded-xl dark:bg-amber-900/30"><TruckIcon size={20}/></div>
-        </Card>
-        <Card className="p-4 border-[var(--border)] bg-[var(--card)] flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-[var(--text-sec)] uppercase">Entregados OK</p>
-            <p className="text-2xl font-black text-emerald-600">{stats.entregados || 0}</p>
-          </div>
-          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl dark:bg-emerald-900/30"><CheckCircle2 size={20}/></div>
-        </Card>
-        <Card className="p-4 border-[var(--border)] bg-[var(--card)] flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-[var(--text-sec)] uppercase">Con Diferencias</p>
-            <p className="text-2xl font-black text-orange-600">{stats.conDiferencias || 0}</p>
-          </div>
-          <div className="p-3 bg-orange-100 text-orange-600 rounded-xl dark:bg-orange-900/30"><PenTool size={20}/></div>
-        </Card>
+      <div className="mb-4">
+        <StateCards
+          cards={[
+            {
+              label: "Total Documentos",
+              value: stats.total || 0,
+              icon: BarChart3,
+              color: "var(--primary)"
+            },
+            {
+              label: "Emitidos Pts",
+              value: stats.emitidos || 0,
+              icon: TruckIcon,
+              color: "#d97706"
+            },
+            {
+              label: "Entregados OK",
+              value: stats.entregados || 0,
+              icon: CheckCircle2,
+              color: "#059669"
+            },
+            {
+              label: "Diferencias",
+              value: stats.conDiferencias || 0,
+              icon: PenTool,
+              color: "#ea580c"
+            }
+          ]}
+        />
       </div>
 
       <Card className="p-4 border-[var(--border)] bg-[var(--card)] shadow-sm">

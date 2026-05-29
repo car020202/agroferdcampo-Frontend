@@ -14,6 +14,7 @@ import { apiRequest } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Badge } from "../components/ui/badge";
+import { InlinePills } from "../components/ui/inline-pills";
 import { Button } from "../components/ui/button";
 import { Switch } from "../components/ui/switch";
 import { Edit } from "lucide-react";
@@ -446,49 +447,31 @@ export function Catalog() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {[
-          {
-            label: "Total Productos",
-            value: products.length,
-            icon: Store,
-            color: "var(--primary)",
-          },
-          {
-            label: "Activos",
-            value: products.filter((p) => p.isActive).length,
-            icon: ToggleRight,
-            color: "#34d399",
-          },
-          {
-            label: "Categorías",
-            value: new Set(
-              products.map((p) => p.category?.name).filter(Boolean),
-            ).size,
-            icon: Tag,
-            color: "#f59e0b",
-          },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card
-            key={label}
-            className="px-5 py-4 flex items-center justify-between border-[var(--border)] bg-[var(--card)] shadow-sm hover:shadow-md transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded-lg"
-                style={{ backgroundColor: `${color}15`, color }}
-              >
-                <Icon size={18} />
-              </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-sec)]">
-                {label}
-              </p>
-            </div>
-            <p className="text-2xl font-black text-[var(--text-main)]">
-              {value}
-            </p>
-          </Card>
-        ))}
+      <div className="mb-6">
+        <InlinePills
+          metrics={[
+            {
+              label: "Total Productos",
+              value: products.length,
+              icon: Store,
+              color: "var(--primary)",
+            },
+            {
+              label: "Activos",
+              value: products.filter((p) => p.isActive).length,
+              icon: ToggleRight,
+              color: "#34d399",
+            },
+            {
+              label: "Categorías",
+              value: new Set(
+                products.map((p) => p.category?.name).filter(Boolean),
+              ).size,
+              icon: Tag,
+              color: "#f59e0b",
+            },
+          ]}
+        />
       </div>
 
       {/* Search & Filters */}

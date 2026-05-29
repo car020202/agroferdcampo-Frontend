@@ -22,6 +22,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { cn } from "../components/ui/utils";
 import { Button } from "../components/ui/button";
+import { StateCards } from "../components/ui/state-cards";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -532,53 +533,35 @@ export function Inventory() {
       </Dialog>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {[
-          {
-            label: "Productos",
-            value: totalItemsCount,
-            icon: Package,
-            color: "var(--primary)",
-          },
-          {
-            label: "Stock Bajo",
-            value: lowStockCount,
-            icon: TrendingDown,
-            color: "#f59e0b",
-          },
-          {
-            label: "Críticos",
-            value: criticalStockCount,
-            icon: AlertCircle,
-            color: "#ef4444",
-          },
-          {
-            label: "Valor Total",
-            value: `$${totalValue.toLocaleString()}`,
-            icon: TrendingUp,
-            color: "#10b981",
-          },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card
-            key={label}
-            className="px-5 py-4 flex items-center justify-between border-[var(--border)] bg-[var(--card)] shadow-sm hover:shadow-md transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded-lg"
-                style={{ backgroundColor: `${color}15`, color }}
-              >
-                <Icon size={18} />
-              </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-sec)]">
-                {label}
-              </p>
-            </div>
-            <p className="text-xl font-black text-[var(--text-main)]">
-              {value}
-            </p>
-          </Card>
-        ))}
+      <div className="mb-6">
+        <StateCards
+          cards={[
+            {
+              label: "Productos",
+              value: totalItemsCount,
+              icon: Package,
+              color: "var(--primary)",
+            },
+            {
+              label: "Stock Bajo",
+              value: lowStockCount,
+              icon: TrendingDown,
+              color: "#f59e0b",
+            },
+            {
+              label: "Críticos",
+              value: criticalStockCount,
+              icon: AlertCircle,
+              color: "#ef4444",
+            },
+            {
+              label: "Valor Total",
+              value: `$${totalValue.toLocaleString()}`,
+              icon: TrendingUp,
+              color: "#10b981",
+            },
+          ]}
+        />
       </div>
 
       {/* Search & Filters */}

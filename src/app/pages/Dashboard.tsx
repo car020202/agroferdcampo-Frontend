@@ -13,6 +13,7 @@ import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { toast } from 'sonner';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { ProgressKPIList } from '../components/ui/progress-kpi-list';
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -127,91 +128,39 @@ export function Dashboard() {
       </div>
 
       {/* METRICS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* VENTAS DIARIAS */}
-        <Card className="border-[var(--border)] bg-[var(--card)] p-6 rounded-2xl relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-wider">Ventas del Día</p>
-              <h3 className="text-3xl font-black text-[var(--text-main)]">
-                {formatCurrency(dailySales?.totalVentas || 0)}
-              </h3>
-            </div>
-            <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-600">
-              <DollarSign size={22} />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-xs text-[var(--text-sec)]">
-            <span>{dailySales?.cantidadTransacciones || 0} transacciones hoy</span>
-            <span className="flex items-center text-emerald-600 font-bold">
-              <TrendingUp size={12} className="mr-1" /> Activo
-            </span>
-          </div>
-        </Card>
-
-        {/* ALBARANES PENDIENTES */}
-        <Card className="border-[var(--border)] bg-[var(--card)] p-6 rounded-2xl relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-wider">Albaranes Pendientes</p>
-              <h3 className="text-3xl font-black text-[var(--text-main)]">
-                {pendingNotesCount}
-              </h3>
-            </div>
-            <div className="p-3 rounded-xl bg-blue-500/10 text-blue-600">
-              <ShoppingBag size={22} />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-xs text-[var(--text-sec)]">
-            <span>Por despachar/entregar</span>
-            <Badge variant={pendingNotesCount > 0 ? "warning" : "success"} className="text-[10px]">
-              {pendingNotesCount > 0 ? 'Pendientes' : 'Al día'}
-            </Badge>
-          </div>
-        </Card>
-
-        {/* STOCK BAJO */}
-        <Card className="border-[var(--border)] bg-[var(--card)] p-6 rounded-2xl relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-wider">Stock Crítico</p>
-              <h3 className="text-3xl font-black text-[var(--text-main)]">
-                {lowStockCount}
-              </h3>
-            </div>
-            <div className="p-3 rounded-xl bg-amber-500/10 text-amber-600">
-              <AlertTriangle size={22} />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-xs text-[var(--text-sec)]">
-            <span>Productos bajo mínimo</span>
-            {lowStockCount > 0 ? (
-              <span className="text-amber-600 font-bold">Revisar</span>
-            ) : (
-              <span className="text-emerald-600 font-bold">Ok</span>
-            )}
-          </div>
-        </Card>
-
-        {/* VALOR DE INVENTARIO */}
-        <Card className="border-[var(--border)] bg-[var(--card)] p-6 rounded-2xl relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="flex justify-between items-start">
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-wider">Valor de Inventario</p>
-              <h3 className="text-3xl font-black text-[var(--text-main)]">
-                {formatCurrency(inventoryValuation)}
-              </h3>
-            </div>
-            <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-600">
-              <Package size={22} />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-xs text-[var(--text-sec)]">
-            <span>Valoración a costo</span>
-            <span className="font-bold text-[var(--primary)]">Activo</span>
-          </div>
-        </Card>
-      </div>
+      <ProgressKPIList
+        kpis={[
+          {
+            label: 'Ventas del Día',
+            value: formatCurrency(dailySales?.totalVentas || 0),
+            icon: DollarSign,
+            color: '#10b981',
+            trend: { value: 12, isPositive: true },
+            subtitle: `${dailySales?.cantidadTransacciones || 0} transacciones hoy`
+          },
+          {
+            label: 'Albaranes Pts',
+            value: pendingNotesCount,
+            icon: ShoppingBag,
+            color: '#3b82f6',
+            subtitle: pendingNotesCount > 0 ? 'Pendientes de entrega' : 'Al día'
+          },
+          {
+            label: 'Stock Crítico',
+            value: lowStockCount,
+            icon: AlertTriangle,
+            color: '#f59e0b',
+            subtitle: 'Productos bajo mínimo'
+          },
+          {
+            label: 'Valor de Inv.',
+            value: formatCurrency(inventoryValuation),
+            icon: Package,
+            color: '#6366f1',
+            subtitle: 'Valoración a costo'
+          }
+        ]}
+      />
 
       {/* DETALLES DE VENTAS Y TOP PRODUCTOS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

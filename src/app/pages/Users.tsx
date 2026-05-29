@@ -23,6 +23,7 @@ import { Card } from "../components/ui/card";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { InlinePills } from "../components/ui/inline-pills";
 import {
   Table,
   TableBody,
@@ -225,8 +226,15 @@ export function Users() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--text-main)]">Usuarios</h1>
-          <p className="text-[var(--text-sec)]">Gestión de accesos, roles y sucursales</p>
+          <h1 className="text-3xl font-bold text-[var(--text-main)] mb-2">Usuarios</h1>
+          <InlinePills
+            metrics={[
+              { label: 'Total Usuarios', value: users.length, icon: UsersIcon, color: 'var(--primary)' },
+              { label: 'Activos', value: users.filter(u => u.isActive).length, icon: UsersIcon, color: '#10b981' },
+              { label: 'Admins', value: users.filter(u => u.roleId === 2).length, icon: Shield, color: '#f59e0b' },
+              { label: 'Inactivos', value: users.filter(u => !u.isActive).length, icon: AlertCircle, color: '#ef4444' },
+            ]}
+          />
         </div>
         <Button
           variant="default"
@@ -236,26 +244,6 @@ export function Users() {
           <Plus size={20} />
           Nuevo Usuario
         </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Total Usuarios', value: users.length, icon: UsersIcon, color: 'var(--primary)' },
-          { label: 'Activos', value: users.filter(u => u.isActive).length, icon: UsersIcon, color: '#10b981' },
-          { label: 'Admins', value: users.filter(u => u.roleId === 2).length, icon: Shield, color: '#f59e0b' },
-          { label: 'Inactivos', value: users.filter(u => !u.isActive).length, icon: AlertCircle, color: '#ef4444' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label} className="px-5 py-4 flex items-center justify-between border-[var(--border)] bg-[var(--card)] shadow-sm hover:shadow-md transition-all">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ backgroundColor: `${color}15`, color }}>
-                <Icon size={18} />
-              </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-sec)]">{label}</p>
-            </div>
-            <p className="text-xl font-black text-[var(--text-main)]">{value}</p>
-          </Card>
-        ))}
       </div>
 
       {/* Search & Filters */}

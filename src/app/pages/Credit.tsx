@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { NumberInput } from '../components/ui/number-input';
+import { SemaphoreBanner } from '../components/ui/semaphore-banner';
 
 let isAbonoSubmittingGlobal = false;
 
@@ -250,26 +251,14 @@ export function Credit() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Cartera Total', value: summary ? summary.totalCxC : 0, icon: CreditCard, color: 'var(--primary)' },
-          { label: 'Saldo Vencido', value: summary ? summary.totalVencido : 0, icon: AlertCircle, color: '#ef4444' },
-          { label: 'Por Vencer (7d)', value: summary ? summary.totalPorVencer : 0, icon: FileText, color: '#f59e0b' },
-          { label: 'Clientes Activos', value: summary ? summary.totalClientes : 0, icon: UsersIcon, color: '#10b981', isCount: true },
-        ].map(({ label, value, icon: Icon, color, isCount }) => (
-          <Card key={label} className="px-5 py-4 flex items-center justify-between border-[var(--border)] bg-[var(--card)] shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ backgroundColor: `${color}15`, color }}>
-                <Icon size={18} />
-              </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-sec)]">{label}</p>
-            </div>
-            <p className="text-xl font-black text-[var(--text-main)]">
-              {isCount ? value : `$${Number(value).toFixed(2)}`}
-            </p>
-          </Card>
-        ))}
-      </div>
+      <SemaphoreBanner
+        metrics={[
+          { label: 'Cartera Total', value: summary ? `$${Number(summary.totalCxC).toFixed(2)}` : '$0.00', status: 'info' },
+          { label: 'Saldo Vencido', value: summary ? `$${Number(summary.totalVencido).toFixed(2)}` : '$0.00', status: 'danger' },
+          { label: 'Por Vencer (7d)', value: summary ? `$${Number(summary.totalPorVencer).toFixed(2)}` : '$0.00', status: 'warning' },
+          { label: 'Clientes Activos', value: summary ? summary.totalClientes : 0, status: 'success' },
+        ]}
+      />
 
       <Card className="p-4 border-[var(--border)] bg-[var(--card)] shadow-sm">
         <div className="flex flex-col md:flex-row gap-4 items-end">
