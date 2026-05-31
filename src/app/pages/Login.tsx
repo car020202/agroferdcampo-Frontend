@@ -38,7 +38,7 @@ export function Login() {
         setStep("select-branch");
       } else if (response.accessToken) {
         console.log('Login exitoso (sucursal única)');
-        navigate("/dashboard");
+        navigate("/home");
       }
     } catch (err: any) {
       console.error('Error en handleSubmit:', err);
@@ -56,7 +56,7 @@ export function Login() {
     try {
       const response = await selectBranch(userId, branchId);
       if (response.accessToken) {
-        navigate("/dashboard");
+        navigate("/home");
       }
     } catch (err: any) {
       setError(err.message || "Error al seleccionar sucursal.");

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  MapPin, Plus, Search, Filter, Calendar, Truck, User, Play, CheckCircle2, XCircle, Printer, Eye, Trash2, PackageCheck
+  MapPin, Plus, Search, Filter, Truck, User, Play, CheckCircle2, XCircle, Printer, Eye, Trash2, PackageCheck, CalendarIcon
 } from 'lucide-react';
 import { useSearchParams } from 'react-router';
+import { format } from 'date-fns';
 
 const getRouteBadgeColors = (status: string) => {
   switch(status) {
@@ -22,6 +23,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Calendar } from '../components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
@@ -364,13 +367,34 @@ export default function DeliveryRoutes() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 flex flex-col">
                 <Label className="text-xs font-bold uppercase tracking-wide text-[var(--text-sec)]">Fecha Programada</Label>
-                <Input 
-                  type="date"
-                  value={createData.scheduledAt?.split('T')[0] || ''}
-                  onChange={e => setCreateData({...createData, scheduledAt: e.target.value})}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={`justify-start text-left font-normal ${!createData.scheduledAt ? "text-muted-foreground" : ""}`}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {createData.scheduledAt ? format(new Date(createData.scheduledAt + 'T12:00:00'), "dd/MM/yyyy") : <span>dd/mm/aaaa</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={createData.scheduledAt ? new Date(createData.scheduledAt + 'T12:00:00') : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const dateString = date.toLocaleDateString('en-CA'); // format YYYY-MM-DD
+                          setCreateData({...createData, scheduledAt: dateString});
+                        } else {
+                          setCreateData({...createData, scheduledAt: undefined});
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">

@@ -100,7 +100,7 @@ export function OtpVerification() {
         
         setUser(mappedUser);
         localStorage.setItem("agro-user", JSON.stringify(mappedUser));
-        navigate("/dashboard");
+        navigate("/home");
       }
     } catch (err: any) {
       setError(err.message || "Código inválido o expirado");

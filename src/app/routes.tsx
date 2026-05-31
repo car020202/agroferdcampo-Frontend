@@ -5,6 +5,7 @@ import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
 import { OtpVerification } from "./pages/OtpVerification";
 import { Users as UsersPage } from "./pages/Users";
+import { Home } from "./pages/Home";
 import { Dashboard } from "./pages/Dashboard";
 import { POS } from "./pages/POS";
 import { Inventory } from "./pages/Inventory";
@@ -46,6 +47,10 @@ export const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
+      {
+        path: "home",
+        element: <Home />,
+      },
       {
         path: "dashboard",
         element: <Dashboard />,

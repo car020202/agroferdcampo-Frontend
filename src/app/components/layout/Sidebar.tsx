@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 const navLinks = [
+  { path: "/home", icon: Sprout, label: "Inicio" },
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/pos", icon: ShoppingCart, label: "Punto de Venta" },
   { path: "/sales", icon: FileText, label: "Historial de Ventas" },

@@ -8,6 +8,7 @@ import { useSearchParams } from 'react-router';
 
 import { deliveryNotesService, DeliveryNoteResponse, DeliverDeliveryNoteDto, CreateDeliveryNoteDto, UpdateDeliveryNoteDto } from '../services/delivery-notes.service';
 import { searchProducts } from '../services/sales.service';
+import { format } from 'date-fns';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
@@ -18,6 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { NumberInput } from '../components/ui/number-input';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Calendar } from '../components/ui/calendar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { Switch } from '../components/ui/switch';
 import { Checkbox } from '../components/ui/checkbox';
@@ -656,13 +659,34 @@ export function DeliveryNotes() {
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col">
               <Label>Fecha Programada (Opcional)</Label>
-              <Input 
-                type="date" 
-                value={assignForm.scheduledAt || ''} 
-                onChange={e => setAssignForm({...assignForm, scheduledAt: e.target.value})} 
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={`justify-start text-left font-normal ${!assignForm.scheduledAt ? "text-muted-foreground" : ""}`}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {assignForm.scheduledAt ? format(new Date(assignForm.scheduledAt + 'T12:00:00'), "dd/MM/yyyy") : <span>dd/mm/aaaa</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={assignForm.scheduledAt ? new Date(assignForm.scheduledAt + 'T12:00:00') : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        const dateString = date.toLocaleDateString('en-CA');
+                        setAssignForm({...assignForm, scheduledAt: dateString});
+                      } else {
+                        setAssignForm({...assignForm, scheduledAt: undefined});
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           <DialogFooter>
