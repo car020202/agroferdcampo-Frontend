@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import { format } from 'date-fns';
+import logoUrl from '../../assets/logo.png';
 
 const getRouteBadgeColors = (status: string) => {
   switch(status) {
@@ -102,7 +103,7 @@ export default function DeliveryRoutes() {
   const fetchAvailableNotes = async () => {
     try {
       // Fetch EMITIDO notes without route
-      const res = await apiRequest<any>('/delivery-notes?status=EMITIDO&limit=100');
+      const res = await apiRequest<any>('/delivery-notes?status=EMITIDO&type=CLIENTE&limit=100');
       // We assume the backend filters out those with routeId if we pass something, 
       // but let's filter locally just in case if no parameter is available
       const dataObj = res.data || res;
@@ -148,8 +149,8 @@ export default function DeliveryRoutes() {
 
   const loadRouteDetail = async (route: DeliveryRoute) => {
     try {
-      const fullRoute = await apiRequest<DeliveryRoute>(`/delivery-routes/${route.id}`);
-      setSelectedRoute(fullRoute);
+      const res = await apiRequest<any>(`/delivery-routes/${route.id}`);
+      setSelectedRoute(res.data || res);
       setDetailOpen(true);
     } catch (e) {
       toast.error('Error al cargar detalle');
@@ -171,78 +172,356 @@ export default function DeliveryRoutes() {
   };
 
   const printRouteSheet = (route: DeliveryRoute) => {
-    // Generar un HTML simple para impresión
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('Permita las ventanas emergentes para imprimir');
+    // Usar un iframe oculto para no abrir ventanas nuevas
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (!iframeDoc) {
+      toast.error('Error al iniciar la impresión');
+      document.body.removeChild(iframe);
       return;
+    }
+
+    const formatDate = (dateString?: Date | string) => {
+      if (!dateString) return '';
+      return new Date(dateString).toLocaleDateString('es-SV', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+    };
+    
+    const formatMoney = (amount?: string | number) => {
+      if (amount === undefined || amount === null) return '$0.00';
+      return new Intl.NumberFormat('es-SV', { style: 'currency', currency: 'USD' }).format(Number(amount));
+    };
+
+    let pagesHtml = '';
+
+    // --- PÁGINA 1: HOJA DE RUTA PRINCIPAL ---
+    pagesHtml += `
+      <div class="header">
+        <img src="${logoUrl}" class="header-logo" alt="Logo" />
+        <div class="header-title">
+          <h1 class="text-xl font-black uppercase">Hoja de Ruta</h1>
+          <p class="text-sm text-gray mt-1">Generada el ${new Date().toLocaleDateString('es-SV')} a las ${new Date().toLocaleTimeString('es-SV')}</p>
+        </div>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">Identificador de Ruta</span>
+          <span class="info-value text-lg font-bold">${route.name}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Fecha Programada</span>
+          <span class="info-value">${formatDate(route.scheduledAt) || 'Sin fecha'}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Vehículo</span>
+          <span class="info-value">${route.vehicle?.plate || 'N/A'} - ${route.vehicle?.brand || ''}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Conductor</span>
+          <span class="info-value">${route.user?.fullName || 'N/A'}</span>
+        </div>
+      </div>
+
+      <h2 class="text-lg font-bold mb-4 uppercase">Entregas Programadas (${(route.deliveryNotes || []).length})</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>N° Doc.</th>
+            <th>Tipo</th>
+            <th>Cliente / Destino</th>
+            <th>Dirección</th>
+            <th class="center">Firma Recibido</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(route.deliveryNotes || []).map((note: any) => `
+            <tr>
+              <td class="font-bold">DN-${note.id}</td>
+              <td>
+                ${note.sale ? `<span class="font-bold">Venta #${note.sale.id}</span>` : 'Albarán/Traslado'}
+              </td>
+              <td class="font-bold">${note.customer?.name || note.toBranch?.name || 'S/N'}</td>
+              <td class="text-sm">${note.deliveryAddress || 'Sin dirección registrada'}</td>
+              <td style="width: 150px; height: 50px;"></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <div class="signatures">
+        <div class="signature-line">Firma de Despacho<br><span style="font-weight:400; font-size:10px; color:#666;">(Autorización de salida)</span></div>
+        <div class="signature-line">Firma de Conductor<br><span style="font-weight:400; font-size:10px; color:#666;">(Aceptación de carga)</span></div>
+      </div>
+    `;
+
+    // --- PÁGINAS SIGUIENTES: DETALLES DE CADA FACTURA/ALBARÁN ---
+    if (route.deliveryNotes && route.deliveryNotes.length > 0) {
+      route.deliveryNotes.forEach((note: any) => {
+        const isSale = !!note.sale;
+        const items = isSale ? note.sale.items : note.items;
+        const totalAmount = isSale ? note.sale.totalAmount : null;
+        
+        pagesHtml += `
+          <div class="page-break"></div>
+          
+          <div class="header">
+            <img src="${logoUrl}" class="header-logo" alt="Logo" />
+            <div class="header-title">
+              <h1 class="text-xl font-black uppercase">${isSale ? 'Factura de Venta' : 'Albarán de Despacho'}</h1>
+              <p class="text-sm text-gray mt-1">Ruta: ${route.name} | Doc: DN-${note.id}</p>
+            </div>
+          </div>
+
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">${isSale ? 'Número de Venta' : 'Número de Documento'}</span>
+              <span class="info-value text-lg font-bold">${isSale ? `Venta #${note.sale.id}` : `DN-${note.id}`}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Fecha de Emisión</span>
+              <span class="info-value">${formatDate(note.issuedAt)}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">${isSale ? 'Cliente' : 'Destinatario'}</span>
+              <span class="info-value font-bold">${note.customer?.name || note.toBranch?.name || 'Consumidor Final'}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Dirección de Entrega</span>
+              <span class="info-value">${note.deliveryAddress || 'Retiro en tienda'}</span>
+            </div>
+          </div>
+
+          <h2 class="text-lg font-bold mb-4 uppercase">Detalle de Productos</h2>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 60px;">Cód.</th>
+                <th>Descripción del Producto</th>
+                <th class="center" style="width: 80px;">Cant.</th>
+                ${isSale ? '<th class="right" style="width: 100px;">Precio U.</th>' : ''}
+                ${isSale ? '<th class="right" style="width: 100px;">Subtotal</th>' : ''}
+              </tr>
+            </thead>
+            <tbody>
+              ${(items || []).map((item: any) => `
+                <tr>
+                  <td class="text-sm text-gray">${item.product?.id || '-'}</td>
+                  <td class="font-bold">${item.product?.name || 'Producto Desconocido'}</td>
+                  <td class="center font-black text-lg">${Number(item.quantity)}</td>
+                  ${isSale ? `<td class="right">${formatMoney(item.unitPrice)}</td>` : ''}
+                  ${isSale ? `<td class="right font-bold">${formatMoney(item.totalPrice)}</td>` : ''}
+                </tr>
+              `).join('')}
+              ${(!items || items.length === 0) ? `<tr><td colspan="5" class="center">Sin productos detallados</td></tr>` : ''}
+            </tbody>
+          </table>
+          
+          <div class="clearfix">
+            ${isSale ? `
+              <div class="totals-box">
+                <div class="totals-row">
+                  <span>Subtotal:</span>
+                  <span>${formatMoney(Number(totalAmount) - Number(note.sale.taxAmount || 0))}</span>
+                </div>
+                <div class="totals-row">
+                  <span>Impuestos:</span>
+                  <span>${formatMoney(note.sale.taxAmount || 0)}</span>
+                </div>
+                <div class="totals-row grand-total">
+                  <span>TOTAL:</span>
+                  <span>${formatMoney(totalAmount)}</span>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="signatures" style="margin-top: ${isSale ? '20px' : '60px'};">
+            <div class="signature-line">Entregado por<br><span style="font-weight:400; font-size:10px; color:#666;">(Firma del Conductor)</span></div>
+            <div class="signature-line">Recibido por<br><span style="font-weight:400; font-size:10px; color:#666;">(Nombre y Firma del Cliente)</span></div>
+          </div>
+        `;
+      });
     }
 
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Hoja de Ruta - ${route.name}</title>
+        <title>Impresión de Ruta - ${route.name}</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 20px; font-size: 12px; }
-          h1 { text-align: center; margin-bottom: 5px; font-size: 18px; }
-          .header-info { display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #000; padding-bottom: 10px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-          th { background-color: #f0f0f0; }
-          .footer { margin-top: 30px; display: flex; justify-content: space-between; }
-          .signature { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; margin-top: 50px; }
+          :root {
+            --primary: #0f172a;
+            --secondary: #64748b;
+            --accent: #2563eb;
+            --border: #e2e8f0;
+          }
+          body { 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+            margin: 0; 
+            padding: 15mm 20mm; /* El margen real lo damos al body para que no se corte */
+            color: var(--primary);
+            background: white;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          @page { 
+            size: letter; 
+            margin: 0; /* Quita el about:blank y fecha automática del navegador */
+          }
+          .page-break { page-break-before: always; }
+          
+          /* Typography & Utilities */
+          h1, h2, h3, p { margin: 0; }
+          .text-sm { font-size: 12px; }
+          .text-base { font-size: 14px; }
+          .text-lg { font-size: 16px; }
+          .text-xl { font-size: 24px; }
+          .font-bold { font-weight: 700; }
+          .font-black { font-weight: 900; }
+          .text-gray { color: var(--secondary); }
+          .text-right { text-align: right; }
+          .uppercase { text-transform: uppercase; }
+          .mb-2 { margin-bottom: 8px; }
+          .mb-4 { margin-bottom: 16px; }
+          .mt-1 { margin-top: 4px; }
+
+          /* Layout Components */
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+          }
+          .header-logo { height: 50px; object-fit: contain; }
+          .header-title { text-align: right; }
+          
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 32px;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+          }
+          .info-item { display: flex; flex-direction: column; gap: 4px; }
+          .info-label { font-size: 10px; font-weight: 800; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+          .info-value { font-size: 14px; font-weight: 600; }
+
+          /* Tables */
+          table { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 30px; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+          th { 
+            background: #f1f5f9; 
+            color: var(--primary); 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            padding: 12px 14px; 
+            text-align: left; 
+            border-bottom: 2px solid var(--border);
+          }
+          th.right { text-align: right; }
+          th.center { text-align: center; }
+          td { 
+            padding: 12px 14px; 
+            border-bottom: 1px solid var(--border); 
+            vertical-align: middle;
+          }
+          tr:last-child td { border-bottom: none; }
+          td.right { text-align: right; }
+          td.center { text-align: center; }
+          tr:nth-child(even) td { background: #fafaf9; }
+          
+          /* Totals */
+          .totals-box {
+            width: 300px;
+            float: right;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 40px;
+          }
+          .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            font-weight: 600;
+          }
+          .totals-row:last-child { border-bottom: none; }
+          .totals-row.grand-total {
+            background: #f1f5f9;
+            color: var(--primary);
+            font-size: 16px;
+            font-weight: 900;
+          }
+
+          /* Signatures */
+          .signatures {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 60px;
+            page-break-inside: avoid;
+            clear: both;
+          }
+          .signature-line {
+            width: 200px;
+            text-align: center;
+            border-top: 1px solid #94a3b8;
+            padding-top: 8px;
+            font-size: 12px;
+            font-weight: 700;
+          }
+          
+          /* Clearfix for float */
+          .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
+          }
         </style>
       </head>
-      <body onload="window.print(); setTimeout(()=>window.close(), 500);">
-        <h1>HOJA DE RUTA</h1>
-        <div class="header-info">
-          <div>
-            <p><strong>Ruta:</strong> ${route.name}</p>
-            <p><strong>Vehículo:</strong> ${route.vehicle?.plate || ''} - ${route.vehicle?.brand || ''}</p>
-          </div>
-          <div>
-            <p><strong>Fecha:</strong> ${new Date().toLocaleDateString()}</p>
-            <p><strong>Conductor:</strong> ${route.user?.fullName || '_________'}</p>
-          </div>
-        </div>
-        
-        <h2>Entregas Programadas</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>N° Albarán</th>
-              <th>Cliente / Destino</th>
-              <th>Dirección</th>
-              <th>Firma Recibido</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${(route.deliveryNotes || []).map((note: any) => `
-              <tr>
-                <td><strong>DN-${note.id}</strong></td>
-                <td>${note.customer?.name || note.toBranch?.name || ''}</td>
-                <td>${note.deliveryAddress || ''}</td>
-                <td style="height: 50px;"></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-
-        <div class="footer">
-          <p>Total paradas: ${(route.deliveryNotes || []).length}</p>
-          <div class="signature">Firma Conductor</div>
-          <div class="signature">Sello Despacho</div>
-        </div>
+      <body>
+        ${pagesHtml}
+        <script>
+          window.onload = () => {
+            setTimeout(() => {
+              window.print();
+            }, 300);
+          };
+        </script>
       </body>
       </html>
     `;
-    printWindow.document.write(html);
-    printWindow.document.close();
+    iframeDoc.open();
+    iframeDoc.write(html);
+    iframeDoc.close();
+
+    // Removemos el iframe después de un tiempo prudencial
+    setTimeout(() => {
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    }, 60000);
   };
 
   return (
-    <div className="flex flex-col gap-6 h-full animate-in fade-in duration-500">
+    <div className="flex flex-col gap-6 h-full">
       <div>
         <h1 className="text-3xl font-bold text-[var(--text-main)]">Rutas de Reparto</h1>
         <p className="text-[var(--text-sec)]">Planifica, asigna y controla los despachos diarios.</p>
@@ -514,32 +793,91 @@ export default function DeliveryRoutes() {
               </DialogHeader>
 
               <div className="p-6 overflow-y-auto space-y-4 bg-[var(--bg)]/30">
-                <h3 className="font-bold text-[var(--text-main)]">Albaranes Asignados ({selectedRoute.deliveryNotes?.length || 0})</h3>
-                <div className="rounded-xl border bg-[var(--card)] overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>N°</TableHead>
-                        <TableHead>Destino</TableHead>
-                        <TableHead>Dirección</TableHead>
-                        <TableHead>Estado</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedRoute.deliveryNotes?.map(note => (
-                        <TableRow key={note.id}>
-                          <TableCell className="font-bold">DN-{note.id}</TableCell>
-                          <TableCell>{note.customer?.name || note.toBranch?.name}</TableCell>
-                          <TableCell className="text-xs">{note.deliveryAddress}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={`text-[10px] ${deliveryNoteStatusColor(note.status)}`}>
-                              {DELIVERY_NOTE_STATUS_LABELS[note.status]}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <h3 className="font-bold text-[var(--text-main)]">Facturas / Albaranes Asignados ({selectedRoute.deliveryNotes?.length || 0})</h3>
+                <div className="space-y-4">
+                  {selectedRoute.deliveryNotes?.map((note: any) => {
+                    const isSale = !!note.sale;
+                    const itemsToShow = isSale ? note.sale.items : note.items;
+                    const totalAmount = isSale ? note.sale.totalAmount : null;
+                    
+                    return (
+                      <Card key={note.id} className="border border-[var(--border)] overflow-hidden">
+                        {/* Cabecera del Albarán */}
+                        <div className="bg-[var(--bg)] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--border)]">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-black text-lg text-[var(--primary)]">DN-{note.id}</span>
+                              <Badge variant="outline" className={`text-[10px] ${deliveryNoteStatusColor(note.status)}`}>
+                                {DELIVERY_NOTE_STATUS_LABELS[note.status as keyof typeof DELIVERY_NOTE_STATUS_LABELS]}
+                              </Badge>
+                              {isSale && (
+                                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-emerald-200">
+                                  Venta #{note.sale.id}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm font-semibold text-[var(--text-main)] flex items-center gap-1">
+                              <User size={14} className="text-[var(--text-sec)]" /> 
+                              {note.customer?.name || note.toBranch?.name || 'Cliente sin nombre'}
+                            </p>
+                            <p className="text-xs text-[var(--text-sec)] flex items-center gap-1 mt-1">
+                              <MapPin size={12} /> {note.deliveryAddress || 'Retiro en tienda / Sin dirección'}
+                            </p>
+                          </div>
+                          
+                          {isSale && (
+                            <div className="text-right">
+                              <p className="text-xs text-[var(--text-sec)] uppercase tracking-wide font-bold">Total Factura</p>
+                              <p className="text-xl font-black text-emerald-600">
+                                {new Intl.NumberFormat('es-SV', { style: 'currency', currency: 'USD' }).format(Number(totalAmount))}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Detalle de Productos */}
+                        <div className="p-0">
+                          <Table>
+                            <TableHeader className="bg-[var(--bg)]/50">
+                              <TableRow>
+                                <TableHead className="text-xs py-2 h-auto">Cód.</TableHead>
+                                <TableHead className="text-xs py-2 h-auto">Producto</TableHead>
+                                <TableHead className="text-xs py-2 h-auto text-center">Cant.</TableHead>
+                                {isSale && <TableHead className="text-xs py-2 h-auto text-right">Precio U.</TableHead>}
+                                {isSale && <TableHead className="text-xs py-2 h-auto text-right">Subtotal</TableHead>}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {itemsToShow?.map((item: any, idx: number) => (
+                                <TableRow key={idx} className="hover:bg-transparent">
+                                  <TableCell className="py-2 text-xs text-[var(--text-sec)]">{item.product?.id}</TableCell>
+                                  <TableCell className="py-2 text-sm font-medium">{item.product?.name}</TableCell>
+                                  <TableCell className="py-2 text-sm text-center font-bold">{Number(item.quantity)}</TableCell>
+                                  {isSale && (
+                                    <TableCell className="py-2 text-sm text-right text-[var(--text-sec)]">
+                                      ${Number(item.unitPrice).toFixed(2)}
+                                    </TableCell>
+                                  )}
+                                  {isSale && (
+                                    <TableCell className="py-2 text-sm text-right font-bold text-[var(--text-main)]">
+                                      ${Number(item.totalPrice).toFixed(2)}
+                                    </TableCell>
+                                  )}
+                                </TableRow>
+                              ))}
+                              {!itemsToShow?.length && (
+                                <TableRow>
+                                  <TableCell colSpan={5} className="text-center text-xs text-[var(--text-sec)] py-4">
+                                    No hay productos detallados
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Eye, Filter, Calendar as CalendarIcon, 
-  TruckIcon, CheckCircle2, Trash2, X, PackageCheck, Plus, Mail, MapPin, PenTool, BarChart3
+  TruckIcon, CheckCircle2, Trash2, X, PackageCheck, Plus, Mail, MapPin, PenTool, BarChart3, Camera, Ban
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSearchParams } from 'react-router';
@@ -27,6 +27,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { useVehicles } from '../hooks/useVehicles';
 import { apiRequest } from '../config/api';
 import { SmartFilter, FilterConfig } from '../components/ui/smart-filter';
+import { SignaturePad } from '../components/ui/signature/SignaturePad';
 
 export function DeliveryNotes() {
   const [notes, setNotes] = useState<DeliveryNoteResponse[]>([]);
@@ -181,6 +182,8 @@ export function DeliveryNotes() {
       setDeliverForm({
         notes: '',
         clientSignedBy: '',
+        clientSignature: '',
+        proofPhoto: '',
         items: fullNote.items.map(i => ({
           productId: i.productId,
           receivedQty: i.quantity
@@ -190,6 +193,57 @@ export function DeliveryNotes() {
     } catch (e) {
       toast.error('Error al cargar detalle para entrega');
     }
+  };
+
+  const handleTotalRejection = () => {
+    if (!selectedNote) return;
+    setDeliverForm({
+      ...deliverForm,
+      notes: deliverForm.notes ? `${deliverForm.notes}\nRechazado en su totalidad.` : 'Rechazado en su totalidad.',
+      items: selectedNote.items.map((i: any) => ({
+        productId: i.productId,
+        receivedQty: 0
+      }))
+    });
+    toast.info('Se han puesto todas las cantidades a cero.');
+  };
+
+  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+        setDeliverForm(prev => ({ ...prev, proofPhoto: base64 }));
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeliverSubmit = async () => {
@@ -494,7 +548,7 @@ export function DeliveryNotes() {
 
       {/* MODAL DETALLE */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="max-w-3xl flex flex-col p-0">
+        <DialogContent className="max-w-3xl sm:max-w-3xl flex flex-col p-0">
           {selectedNote && (
             <>
               <DialogHeader className="p-6 border-b">
@@ -563,66 +617,162 @@ export function DeliveryNotes() {
 
       {/* MODAL CONFIRMAR ENTREGA (Signature) */}
       <Dialog open={deliverModalOpen} onOpenChange={setDeliverModalOpen}>
-        <DialogContent className="max-w-2xl p-0">
+        <DialogContent className="max-w-5xl sm:max-w-5xl p-0 flex flex-col md:flex-row h-auto max-h-[90vh] md:h-[85vh] bg-[var(--bg)] border-[var(--border)] overflow-y-auto md:overflow-hidden rounded-2xl shadow-2xl">
           {selectedNote && (
             <>
-              <DialogHeader className="p-6 border-b">
-                <DialogTitle className="flex items-center gap-2 text-emerald-600"><PackageCheck /> Confirmar Entrega Físicamente</DialogTitle>
-                <DialogDescription>
-                  {selectedNote.number} a {selectedNote.type === 'CLIENTE' ? selectedNote.customer?.name || 'Consumidor Final' : selectedNote.toBranch?.name}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="p-6 overflow-y-auto space-y-6">
+              {/* Left Column: Details & Items */}
+              <div className="flex-none md:flex-1 flex flex-col border-b md:border-b-0 md:border-r border-[var(--border)] bg-[var(--bg)] relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none"></div>
                 
-                {selectedNote.requiresTransport && (
-                  <div className="space-y-2">
-                    <Label className="text-emerald-700 font-bold">Nombre de quien recibe *</Label>
-                    <Input 
-                      placeholder="Nombre, DPI o Firma del cliente..." 
-                      value={deliverForm.clientSignedBy || ''} 
-                      onChange={e => setDeliverForm({...deliverForm, clientSignedBy: e.target.value})}
-                      className="border-emerald-200 focus-visible:ring-emerald-500"
+                <DialogHeader className="p-6 md:p-8 border-b border-[var(--border)]/50 relative z-10">
+                  <DialogTitle className="flex items-center gap-3 text-2xl text-[var(--text-main)] font-bold">
+                    <div className="p-2.5 bg-emerald-500/20 text-emerald-500 rounded-xl shadow-inner">
+                      <PackageCheck size={26} strokeWidth={2.5} />
+                    </div>
+                    Confirmar Entrega
+                  </DialogTitle>
+                  <DialogDescription className="text-[var(--text-sec)] text-base mt-3 flex flex-col gap-1">
+                    <span>Albarán <strong className="text-[var(--text-main)]">#{selectedNote.number}</strong></span>
+                    <span>Destino: <strong className="text-[var(--text-main)]">{selectedNote.type === 'CLIENTE' ? selectedNote.customer?.name || 'Consumidor Final' : selectedNote.toBranch?.name}</strong></span>
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="p-6 md:p-8 overflow-visible md:overflow-y-auto space-y-8 flex-none md:flex-1 scrollbar-thin">
+                  <div>
+                    <div className="flex justify-between items-center mb-4">
+                      <Label className="text-lg font-bold text-[var(--text-main)]">Cantidades a Entregar</Label>
+                      <Button variant="outline" size="sm" onClick={handleTotalRejection} className="text-red-500 border-red-500/20 hover:bg-red-500/10 hover:border-red-500/30 transition-colors rounded-xl">
+                        <Ban size={16} className="mr-2"/> Rechazo Total
+                      </Button>
+                    </div>
+                    
+                    <div className="border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--card)] shadow-sm">
+                      <Table>
+                        <TableHeader className="bg-[var(--bg)]/50">
+                          <TableRow className="border-[var(--border)]">
+                            <TableHead className="font-semibold text-[var(--text-sec)]">Producto</TableHead>
+                            <TableHead className="text-center font-semibold text-[var(--text-sec)]">Cant. Original</TableHead>
+                            <TableHead className="text-right font-semibold text-[var(--text-sec)] pr-6">Cant. Real</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedNote.items?.map((item: any) => {
+                            const formItem = deliverForm.items.find(i => i.productId === item.productId);
+                            const isDiff = formItem?.receivedQty !== item.quantity;
+                            return (
+                              <TableRow key={item.id} className={`border-[var(--border)] transition-colors ${isDiff ? 'bg-amber-500/5 dark:bg-amber-500/10' : 'hover:bg-[var(--bg)]/50'}`}>
+                                <TableCell className="font-semibold text-[var(--text-main)] py-4">{item.product?.name}</TableCell>
+                                <TableCell className="text-center font-bold text-[var(--text-sec)] py-4">{item.quantity}</TableCell>
+                                <TableCell className="text-right flex justify-end py-3 pr-4">
+                                  <div className="w-28">
+                                    <NumberInput value={formItem?.receivedQty || 0} max={item.quantity} min={0} onValueChange={(val) => {
+                                      const newItems = [...deliverForm.items];
+                                      const idx = newItems.findIndex(i => i.productId === item.productId);
+                                      if (idx >= 0) newItems[idx].receivedQty = val || 0;
+                                      setDeliverForm({ ...deliverForm, items: newItems });
+                                    }}/>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3 bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm">
+                    <Label className="text-base font-bold text-[var(--text-main)]">Notas u Observaciones (Opcional)</Label>
+                    <textarea 
+                      className="w-full flex min-h-[100px] rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3 text-sm text-[var(--text-main)] ring-offset-background placeholder:text-[var(--text-sec)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 transition-all resize-none"
+                      placeholder="Ej. El cliente rechazó 1 producto porque la caja estaba húmeda..." 
+                      value={deliverForm.notes || ''} 
+                      onChange={e => setDeliverForm({ ...deliverForm, notes: e.target.value })}
                     />
                   </div>
-                )}
-
-                <div className="border rounded-xl overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow><TableHead>Producto</TableHead><TableHead className="text-center">Cant. Original</TableHead><TableHead className="text-right">Cant. Real</TableHead></TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedNote.items?.map((item: any) => {
-                        const formItem = deliverForm.items.find(i => i.productId === item.productId);
-                        return (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-bold">{item.product?.name}</TableCell>
-                            <TableCell className="text-center font-bold">{item.quantity}</TableCell>
-                            <TableCell className="text-right flex justify-end">
-                              <div className="w-24">
-                                <NumberInput value={formItem?.receivedQty || 0} max={item.quantity} min={0} onValueChange={(val) => {
-                                  const newItems = [...deliverForm.items];
-                                  const idx = newItems.findIndex(i => i.productId === item.productId);
-                                  if (idx >= 0) newItems[idx].receivedQty = val || 0;
-                                  setDeliverForm({ ...deliverForm, items: newItems });
-                                }}/>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="space-y-2">
-                  <Label>Notas de Entrega (Opcional)</Label>
-                  <Input placeholder="Ej. El cliente rechazó 1 producto..." value={deliverForm.notes || ''} onChange={e => setDeliverForm({ ...deliverForm, notes: e.target.value })}/>
                 </div>
               </div>
-              <DialogFooter className="p-6 border-t bg-[var(--card)]">
-                <Button variant="outline" onClick={() => setDeliverModalOpen(false)}>Cancelar</Button>
-                <Button onClick={handleDeliverSubmit} disabled={delivering} className="bg-emerald-600 text-white font-bold">{delivering ? 'Procesando...' : 'Confirmar Entrega'}</Button>
-              </DialogFooter>
+
+              {/* Right Column: Evidence & Signatures */}
+              <div className="w-full md:w-[420px] flex flex-col bg-[var(--card)] relative z-20 md:shadow-[-10px_0_30px_-15px_rgba(0,0,0,0.1)]">
+                <div className="p-6 md:p-8 flex-none md:flex-1 overflow-visible md:overflow-y-auto space-y-8 scrollbar-thin">
+                  {selectedNote.requiresTransport && (
+                    <div className="space-y-8">
+                      <div className="space-y-3">
+                        <Label className="text-xs font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Nombre del Receptor *
+                        </Label>
+                        <Input 
+                          placeholder="Nombre o DPI de quien recibe..." 
+                          value={deliverForm.clientSignedBy || ''} 
+                          onChange={e => setDeliverForm({...deliverForm, clientSignedBy: e.target.value})}
+                          className="h-12 border-[var(--border)] bg-[var(--bg)] focus-visible:ring-emerald-500 text-base rounded-xl font-medium"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-wider">Firma Digital</Label>
+                        <SignaturePad 
+                          onSignatureChange={(sig) => setDeliverForm({...deliverForm, clientSignature: sig || undefined})} 
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <Label className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-wider">Evidencia Fotográfica</Label>
+                    {!deliverForm.proofPhoto ? (
+                      <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-[var(--border)] rounded-2xl cursor-pointer hover:bg-[var(--bg)] transition-all group hover:border-emerald-500/50">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6 text-[var(--text-sec)] group-hover:text-emerald-500 transition-colors">
+                          <div className="p-4 bg-[var(--bg)] rounded-full mb-3 group-hover:bg-emerald-500/10 transition-colors shadow-sm">
+                            <Camera className="w-8 h-8" />
+                          </div>
+                          <p className="text-sm font-bold">Capturar o Subir Foto</p>
+                          <p className="text-xs mt-1 opacity-70">Opcional • JPG o PNG</p>
+                        </div>
+                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoCapture} />
+                      </label>
+                    ) : (
+                      <div className="relative rounded-2xl overflow-hidden border border-[var(--border)] shadow-sm group">
+                        <img src={deliverForm.proofPhoto} alt="Evidencia" className="w-full h-48 object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            className="rounded-full px-5 py-2 h-auto text-sm font-bold shadow-lg"
+                            onClick={() => setDeliverForm({...deliverForm, proofPhoto: undefined})}
+                          >
+                            <Trash2 size={16} className="mr-2"/> Eliminar Foto
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="p-6 md:p-8 border-t border-[var(--border)] bg-[var(--bg)]/50 flex flex-col gap-3 backdrop-blur-md">
+                  <Button 
+                    onClick={handleDeliverSubmit} 
+                    disabled={delivering} 
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-14 text-lg shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98] rounded-xl"
+                  >
+                    {delivering ? (
+                      <span className="flex items-center gap-2">
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/> Procesando...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2"><CheckCircle2 size={22}/> Confirmar Entrega</span>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => setDeliverModalOpen(false)} 
+                    className="w-full h-12 text-[var(--text-sec)] hover:text-[var(--text-main)] hover:bg-[var(--border)]/50 rounded-xl font-semibold"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
             </>
           )}
         </DialogContent>
@@ -630,7 +780,7 @@ export function DeliveryNotes() {
 
       {/* MODAL ASIGNAR TRANSPORTE */}
       <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-600"><TruckIcon /> Asignar Transporte</DialogTitle>
             <DialogDescription>
@@ -698,7 +848,7 @@ export function DeliveryNotes() {
 
       {/* MODAL CERRAR CON OBSERVACIÓN */}
       <Dialog open={closeObservationModalOpen} onOpenChange={setCloseObservationModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-emerald-600">
               <CheckCircle2 /> Cerrar con Observación
