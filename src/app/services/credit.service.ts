@@ -66,6 +66,50 @@ export interface RegisterPaymentDto {
   notes?: string;
 }
 
+export type CreditDocumentStatus = 'SOLICITADO' | 'RECIBIDO' | 'RECHAZADO';
+
+export type CreditDocumentType =
+  | 'DUI'
+  | 'NIT'
+  | 'COMPROBANTE_INGRESOS'
+  | 'RECIBO_SERVICIOS'
+  | 'CARTA_TRABAJO'
+  | 'ESTADO_CUENTA_BANCO'
+  | 'ESCRITURA_PROPIEDAD'
+  | 'FIADOR'
+  | 'REFERENCIA_COMERCIAL'
+  | 'FOTO_NEGOCIO'
+  | 'OTRO';
+
+export interface CreditDocument {
+  id: number;
+  creditSaleId: number;
+  documentType: CreditDocumentType;
+  documentName: string;
+  status: CreditDocumentStatus;
+  notes?: string;
+  fileUrl?: string;
+  requestedAt: string;
+  receivedAt?: string;
+  creator?: { fullName: string };
+}
+
+export interface CreateCreditDocumentDto {
+  documentType: CreditDocumentType;
+  documentName: string;
+  status?: CreditDocumentStatus;
+  notes?: string;
+  fileUrl?: string;
+}
+
+export interface UpdateCreditDocumentDto {
+  status?: CreditDocumentStatus;
+  notes?: string;
+  fileUrl?: string;
+  receivedAt?: string;
+}
+
+
 export const creditService = {
   getCredits: (params?: { page?: number; limit?: number; status?: string; customerId?: number }) => {
     const query = new URLSearchParams();
@@ -113,4 +157,24 @@ export const creditService = {
       body: JSON.stringify({ ...data, amount: Number(data.amount) }),
     });
   },
+
+  getDocuments: (creditSaleId: number) =>
+    apiRequest<CreditDocument[]>(`/credit/${creditSaleId}/documents`),
+
+  createDocument: (creditSaleId: number, data: CreateCreditDocumentDto) =>
+    apiRequest<CreditDocument>(`/credit/${creditSaleId}/documents`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateDocument: (documentId: number, data: UpdateCreditDocumentDto) =>
+    apiRequest<CreditDocument>(`/credit/documents/${documentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteDocument: (documentId: number) =>
+    apiRequest<void>(`/credit/documents/${documentId}`, {
+      method: 'DELETE',
+    }),
 };

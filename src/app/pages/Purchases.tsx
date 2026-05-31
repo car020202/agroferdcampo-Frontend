@@ -7,7 +7,7 @@ import {
 import { useSearchParams } from 'react-router';
 import { SupplierManager } from '../components/suppliers/SupplierManager';
 import { Payables } from './Payables';
-import { purchasesService, PurchaseResponse, CreatePurchaseDto, getSuppliers } from '../services/purchases.service';
+import { purchasesService, PurchaseResponse, CreatePurchaseDto, getSuppliers, UnlinkedPayment } from '../services/purchases.service';
 import { searchProducts } from '../services/sales.service';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
@@ -63,6 +63,10 @@ export function Purchases() {
   const [receiveForm, setReceiveForm] = useState({ documentType: 'FACTURA' as any, documentNumber: '', notes: '' });
   const [receiving, setReceiving] = useState(false);
   const [receivedItems, setReceivedItems] = useState<Array<{ productId: number; productName: string; quantity: number; received: number }>>([]);
+  
+  const [unlinkedPayments, setUnlinkedPayments] = useState<UnlinkedPayment[]>([]);
+  const [loadingUnlinkedPayments, setLoadingUnlinkedPayments] = useState(false);
+  const [selectedLinkedPaymentId, setSelectedLinkedPaymentId] = useState<string>('');
 
   useEffect(() => {
     if (activeTab === 'compras') {
@@ -172,6 +176,18 @@ export function Purchases() {
         }))
       );
       setReceiveForm({ documentType: 'FACTURA', documentNumber: '', notes: '' });
+      setSelectedLinkedPaymentId('');
+
+      setLoadingUnlinkedPayments(true);
+      try {
+        const payments = await purchasesService.getUnlinkedPayments();
+        setUnlinkedPayments(payments);
+      } catch {
+        setUnlinkedPayments([]);
+      } finally {
+        setLoadingUnlinkedPayments(false);
+      }
+
       setReceiveModalOpen(true);
     } catch (e) {
       toast.error('Error al obtener los detalles de la orden');
@@ -203,7 +219,8 @@ export function Purchases() {
         items: receivedItems.map((item) => ({
           productId: item.productId,
           received: Number(item.received)
-        }))
+        })),
+        ...(selectedLinkedPaymentId ? { linkedCashEntryId: Number(selectedLinkedPaymentId) } : {}),
       };
 
       await purchasesService.receivePurchase(selectedPurchase.id, payload as any);
@@ -690,6 +707,38 @@ export function Purchases() {
                   onChange={e => setReceiveForm({...receiveForm, notes: e.target.value})}
                   className="bg-[var(--card)]"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  Vincular Pago Previo
+                  <span className="text-[var(--text-sec)] font-normal text-xs">(Opcional)</span>
+                </Label>
+                {loadingUnlinkedPayments ? (
+                  <p className="text-xs text-[var(--text-sec)] animate-pulse">Buscando pagos registrados...</p>
+                ) : unlinkedPayments.length === 0 ? (
+                  <p className="text-xs text-[var(--text-sec)] italic">No hay pagos previos sin vincular</p>
+                ) : (
+                  <Select
+                    value={selectedLinkedPaymentId || 'none'}
+                    onValueChange={v => setSelectedLinkedPaymentId(v === 'none' ? '' : v)}
+                  >
+                    <SelectTrigger className="bg-[var(--card)]">
+                      <SelectValue placeholder="No vincular" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No vincular</SelectItem>
+                      {unlinkedPayments.map(p => (
+                        <SelectItem key={p.id} value={p.id.toString()}>
+                          ${Number(p.amount).toFixed(2)} — {p.description} ({new Date(p.date).toLocaleDateString()})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-[var(--text-sec)]">
+                  Si ya registraste el pago a este proveedor en caja, puedes vincularlo aquí.
+                </p>
               </div>
             </div>
 

@@ -22,12 +22,22 @@ export interface ReceivePurchaseItemDto {
 export interface ReceivePurchaseDto {
   notes?: string;
   items: ReceivePurchaseItemDto[];
+  linkedCashEntryId?: number;
 }
 
 export interface PayPurchaseDto {
   paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
   cashSource: 'CAJA_GENERAL' | 'CAJA_CHICA';
   paymentRef?: string;
+  transferReceiptUrl?: string;
+}
+
+export interface UnlinkedPayment {
+  id: number;
+  amount: number;
+  description: string;
+  date: string;
+  reference?: string;
 }
 
 export interface PurchaseResponse {
@@ -97,6 +107,10 @@ export const purchasesService = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  },
+
+  getUnlinkedPayments: async (): Promise<UnlinkedPayment[]> => {
+    return await apiRequest<UnlinkedPayment[]>('/purchases/unlinked-payments');
   },
 
   getPurchases: async (filters: PurchaseFilters = {}): Promise<PaginatedPurchases> => {

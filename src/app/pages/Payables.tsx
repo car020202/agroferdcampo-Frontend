@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  FileText, AlertCircle, Plus, Eye, History, CreditCard, DollarSign
+  FileText, AlertCircle, Plus, Eye, History, CreditCard, DollarSign, Upload, X as XIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { purchasesService, PurchaseResponse, PayPurchaseDto } from '../services/purchases.service';
+import { uploadsService } from '../services/uploads.service';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
@@ -31,6 +32,9 @@ export function Payables() {
     paymentRef: ''
   });
   const [savingPayment, setSavingPayment] = useState(false);
+  const [transferReceiptFile, setTransferReceiptFile] = useState<File | null>(null);
+  const [transferReceiptPreview, setTransferReceiptPreview] = useState<string>('');
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
   useEffect(() => {
     fetchPurchases();
@@ -74,6 +78,8 @@ export function Payables() {
       cashSource: 'CAJA_GENERAL',
       paymentRef: ''
     });
+    setTransferReceiptFile(null);
+    setTransferReceiptPreview('');
     setPaymentModalOpen(true);
   };
 
@@ -81,9 +87,26 @@ export function Payables() {
     if (!selectedPurchase) return;
     setSavingPayment(true);
     try {
-      await purchasesService.payPurchase(selectedPurchase.id, paymentForm);
+      let transferReceiptUrl: string | undefined;
+
+      if (transferReceiptFile && paymentForm.paymentMethod === 'TRANSFERENCIA') {
+        setUploadingReceipt(true);
+        try {
+          const uploaded = await uploadsService.uploadReceipt(transferReceiptFile);
+          transferReceiptUrl = uploaded.url;
+        } finally {
+          setUploadingReceipt(false);
+        }
+      }
+
+      await purchasesService.payPurchase(selectedPurchase.id, {
+        ...paymentForm,
+        ...(transferReceiptUrl ? { transferReceiptUrl } : {}),
+      });
       toast.success('Pago a proveedor registrado correctamente');
       setPaymentModalOpen(false);
+      setTransferReceiptFile(null);
+      setTransferReceiptPreview('');
       fetchPurchases();
     } catch (e: any) {
       toast.error(e.message || 'Error al registrar pago');
@@ -286,15 +309,69 @@ export function Payables() {
                 onChange={e => setPaymentForm({...paymentForm, paymentRef: e.target.value})}
               />
             </div>
+
+            {paymentForm.paymentMethod === 'TRANSFERENCIA' && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  Captura de Pantalla de Transferencia
+                  <span className="text-[var(--text-sec)] font-normal text-xs">(Opcional)</span>
+                </Label>
+
+                {transferReceiptPreview ? (
+                  <div className="relative rounded-xl overflow-hidden border border-[var(--border)] group">
+                    <img
+                      src={transferReceiptPreview}
+                      alt="Comprobante de transferencia"
+                      className="w-full max-h-48 object-contain bg-[var(--bg)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTransferReceiptFile(null);
+                        setTransferReceiptPreview('');
+                      }}
+                      className="absolute top-2 right-2 bg-rose-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <XIcon size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-[var(--border)] rounded-xl p-6 cursor-pointer hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 transition-colors">
+                    <Upload size={22} className="text-[var(--text-sec)]" />
+                    <span className="text-sm text-[var(--text-sec)] font-medium">
+                      Haz clic para adjuntar la captura
+                    </span>
+                    <span className="text-xs text-[var(--text-sec)]">JPG, PNG o WEBP — máx. 5MB</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast.error('La imagen no puede superar 5MB');
+                          return;
+                        }
+                        setTransferReceiptFile(file);
+                        const reader = new FileReader();
+                        reader.onload = ev => setTransferReceiptPreview(ev.target?.result as string);
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentModalOpen(false)}>Cancelar</Button>
             <Button
               onClick={handlePaymentSubmit}
-              disabled={savingPayment}
+              disabled={savingPayment || uploadingReceipt}
               style={{ backgroundColor: 'var(--primary)', color: '#fff' }}
             >
-              {savingPayment ? 'Registrando...' : 'Confirmar Pago'}
+              {uploadingReceipt ? 'Subiendo imagen...' : savingPayment ? 'Registrando...' : 'Confirmar Pago'}
             </Button>
           </DialogFooter>
         </DialogContent>

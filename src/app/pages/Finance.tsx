@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
+import { apiRequest } from '../config/api';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -60,8 +61,13 @@ export function Finance() {
     category: 'VENTAS',
     amount: '',
     description: '',
-    reference: ''
+    reference: '',
+    purchaseId: '' as string | number,
   });
+
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [supplierPurchases, setSupplierPurchases] = useState<any[]>([]);
+  const [loadingPurchasesForLink, setLoadingPurchasesForLink] = useState(false);
 
   // --- PETTY CASH STATE ---
   const [pettyStatus, setPettyStatus] = useState<PettyCashStatus | null>(null);
@@ -85,6 +91,21 @@ export function Finance() {
       fetchPettyCash();
     }
   }, [activeTab, generalFilters.page, generalFilters.category, typeFilter, categoryFilter, startDateFilter, endDateFilter]);
+
+  useEffect(() => {
+    if (newGeneralEntry.category === 'PAGO_PROVEEDOR') {
+      setLoadingPurchasesForLink(true);
+      apiRequest<any>('/purchases?isPaid=false&limit=50')
+        .then((res: any) => {
+          const items = Array.isArray(res) ? res : res.data || [];
+          setSupplierPurchases(items.filter((p: any) => p.status !== 'BORRADOR' && p.status !== 'CANCELADA'));
+        })
+        .catch(() => setSupplierPurchases([]))
+        .finally(() => setLoadingPurchasesForLink(false));
+    } else {
+      setNewGeneralEntry(prev => ({ ...prev, purchaseId: '' }));
+    }
+  }, [newGeneralEntry.category]);
 
   // --- GENERAL CASH LOGIC ---
   const fetchGeneralCash = async () => {
@@ -126,11 +147,12 @@ export function Finance() {
         category: newGeneralEntry.category,
         amount: Number(newGeneralEntry.amount),
         description: newGeneralEntry.description,
-        reference: newGeneralEntry.reference
+        reference: newGeneralEntry.reference,
+        ...(newGeneralEntry.purchaseId ? { purchaseId: Number(newGeneralEntry.purchaseId) } : {}),
       });
       toast.success('Movimiento registrado exitosamente');
       setShowAddGeneralModal(false);
-      setNewGeneralEntry({ type: 'INGRESO', category: 'VENTAS', amount: '', description: '', reference: '' });
+      setNewGeneralEntry({ type: 'INGRESO', category: 'VENTAS', amount: '', description: '', reference: '', purchaseId: '' });
       fetchGeneralCash();
     } catch (error: any) {
       toast.error(error.message || 'Error al registrar movimiento');
@@ -495,6 +517,37 @@ export function Finance() {
               <label className="text-sm font-bold">Descripción</label>
               <Input value={newGeneralEntry.description} onChange={e => setNewGeneralEntry({...newGeneralEntry, description: e.target.value})} placeholder="Ej. Pago de luz" />
             </div>
+            {newGeneralEntry.category === 'PAGO_PROVEEDOR' && (
+              <div className="space-y-2">
+                <label className="text-sm font-bold">
+                  Vincular a Orden de Compra{' '}
+                  <span className="font-normal text-[var(--text-sec)]">(Opcional)</span>
+                </label>
+                {loadingPurchasesForLink ? (
+                  <p className="text-xs text-[var(--text-sec)] animate-pulse">Cargando órdenes...</p>
+                ) : (
+                  <Select
+                    value={newGeneralEntry.purchaseId?.toString() || 'none'}
+                    onValueChange={v => setNewGeneralEntry({ ...newGeneralEntry, purchaseId: v === 'none' ? '' : v })}
+                  >
+                    <SelectTrigger className="bg-[var(--card)]">
+                      <SelectValue placeholder="Seleccionar orden (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin vincular por ahora</SelectItem>
+                      {supplierPurchases.map((p: any) => (
+                        <SelectItem key={p.id} value={p.id.toString()}>
+                          OC-{p.id.toString().padStart(6, '0')} — {p.supplier?.name} — ${Number(p.totalAmount).toFixed(2)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-[var(--text-sec)]">
+                  Si el proveedor llegó sin tiempo de registrar el ingreso, puedes vincular este pago a la orden de compra y luego recibir la mercadería.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddGeneralModal(false)}>Cancelar</Button>

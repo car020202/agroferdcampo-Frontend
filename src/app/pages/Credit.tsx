@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Search, FileText, Filter,
-  CreditCard, DollarSign, AlertCircle, Plus, Eye, History, Users as UsersIcon
+  Search, FileText, Filter, CheckCircle2,
+  CreditCard, DollarSign, AlertCircle, Plus, Eye, History, Users as UsersIcon, RefreshCcw, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSearchParams } from 'react-router';
 
-import { creditService, CreditSale, CreditSummary, CreditPayment, RegisterPaymentDto, GroupedCreditCustomer } from '../services/credit.service';
+import { creditService, CreditSale, CreditSummary, CreditPayment, RegisterPaymentDto, GroupedCreditCustomer, CreditDocument, CreditDocumentStatus, CreateCreditDocumentDto } from '../services/credit.service';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
@@ -51,6 +51,7 @@ export function Credit() {
   const [selectedSpecificCredit, setSelectedSpecificCredit] = useState<CreditSale | null>(null);
   const [specificPayments, setSpecificPayments] = useState<CreditPayment[]>([]);
   const [specificPaymentsPage, setSpecificPaymentsPage] = useState(1);
+  const [specificDetailTab, setSpecificDetailTab] = useState<'abonos' | 'documentos'>('abonos');
 
   // Inner Modal Filters
   const [innerStatusFilter, setInnerStatusFilter] = useState('all');
@@ -62,6 +63,10 @@ export function Credit() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   
+  // Payment Detail Modal
+  const [paymentDetailModalOpen, setPaymentDetailModalOpen] = useState(false);
+  const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<CreditPayment | null>(null);
+  
   // Payment Form
   const [paymentForm, setPaymentForm] = useState<RegisterPaymentDto>({
     amount: 0,
@@ -70,6 +75,18 @@ export function Credit() {
     notes: ''
   });
   const [savingPayment, setSavingPayment] = useState(false);
+
+  // Credit Documents State
+  const [creditDocuments, setCreditDocuments] = useState<CreditDocument[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [addDocModalOpen, setAddDocModalOpen] = useState(false);
+  const [newDoc, setNewDoc] = useState<CreateCreditDocumentDto>({
+    documentType: 'DUI',
+    documentName: '',
+    status: 'SOLICITADO',
+    notes: '',
+  });
+  const [savingDoc, setSavingDoc] = useState(false);
 
   useEffect(() => {
     fetchSummary();
@@ -129,9 +146,70 @@ export function Credit() {
       setSelectedSpecificCredit(sale);
       setSpecificPayments(Array.isArray(creditPayments) ? creditPayments : []);
       setSpecificPaymentsPage(1);
+      setSpecificDetailTab('abonos');
+      fetchCreditDocuments(sale.id);
       setSpecificDetailModalOpen(true);
     } catch (e) {
       toast.error('Error al cargar detalle del crédito');
+    }
+  };
+
+  const fetchCreditDocuments = async (creditSaleId: number) => {
+    setLoadingDocs(true);
+    try {
+      const docs = await creditService.getDocuments(creditSaleId);
+      setCreditDocuments(Array.isArray(docs) ? docs : []);
+    } catch {
+      setCreditDocuments([]);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  const handleToggleDocStatus = async (doc: CreditDocument) => {
+    const nextStatus: CreditDocumentStatus =
+      doc.status === 'SOLICITADO' ? 'RECIBIDO' :
+      doc.status === 'RECIBIDO' ? 'RECHAZADO' : 'SOLICITADO';
+    try {
+      await creditService.updateDocument(doc.id, {
+        status: nextStatus,
+        receivedAt: nextStatus === 'RECIBIDO' ? new Date().toISOString() : undefined,
+      });
+      toast.success(`Documento marcado como ${nextStatus}`);
+      if (selectedSpecificCredit) fetchCreditDocuments(selectedSpecificCredit.id);
+    } catch {
+      toast.error('Error al actualizar documento');
+    }
+  };
+
+  const handleSaveDoc = async () => {
+    if (!selectedSpecificCredit) return;
+    if (!newDoc.documentName.trim()) {
+      toast.error('El nombre del documento es obligatorio');
+      return;
+    }
+    setSavingDoc(true);
+    try {
+      await creditService.createDocument(selectedSpecificCredit.id, newDoc);
+      toast.success('Documento agregado');
+      setAddDocModalOpen(false);
+      setNewDoc({ documentType: 'DUI', documentName: '', status: 'SOLICITADO', notes: '' });
+      fetchCreditDocuments(selectedSpecificCredit.id);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al guardar documento');
+    } finally {
+      setSavingDoc(false);
+    }
+  };
+
+  const handleDeleteDoc = async (docId: number) => {
+    if (!confirm('¿Eliminar este documento?')) return;
+    try {
+      await creditService.deleteDocument(docId);
+      toast.success('Documento eliminado');
+      if (selectedSpecificCredit) fetchCreditDocuments(selectedSpecificCredit.id);
+    } catch (e: any) {
+      toast.error(e.message || 'No se puede eliminar un documento ya recibido');
     }
   };
 
@@ -145,6 +223,11 @@ export function Credit() {
       notes: ''
     });
     setPaymentModalOpen(true);
+  };
+
+  const handleOpenPaymentDetail = (payment: CreditPayment) => {
+    setSelectedPaymentDetail(payment);
+    setPaymentDetailModalOpen(true);
   };
 
   const handlePaymentSubmit = async () => {
@@ -587,23 +670,48 @@ export function Credit() {
         </DialogContent>
       </Dialog>
 
-      {/* DETALLE DE FACTURA ESPECÍFICA (HISTORIAL DE ABONOS) */}
+      {/* DETALLE DE FACTURA ESPECÍFICA (HISTORIAL DE ABONOS Y DOCUMENTOS) */}
       <Dialog open={specificDetailModalOpen} onOpenChange={setSpecificDetailModalOpen}>
-        <DialogContent className="sm:max-w-3xl w-full flex flex-col p-0">
+        <DialogContent className="sm:max-w-5xl w-full flex flex-col p-0 max-h-[90vh]">
           {selectedSpecificCredit && (
             <>
-              <DialogHeader className="p-6 pr-16 border-b">
+              <DialogHeader className="p-6 pr-16 border-b shrink-0 bg-[var(--bg)]/50">
                 <DialogTitle className="flex items-center justify-between">
                   <span>Venta #{selectedSpecificCredit.saleId}</span>
                   {getStatusBadge(selectedSpecificCredit.status)}
                 </DialogTitle>
                 <DialogDescription>
-                  Historial de abonos para esta compra.
+                  Historial de abonos y documentos requeridos para esta compra.
                 </DialogDescription>
               </DialogHeader>
-              <div className="p-6 overflow-y-auto space-y-6">
-                <div>
-                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><History size={18}/> Historial de Abonos</h3>
+
+              <div className="flex px-6 pt-2 gap-4 border-b shrink-0 bg-[var(--bg)]/30">
+                <button
+                  className={`flex-1 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-colors flex items-center justify-center gap-2 ${
+                    specificDetailTab === 'abonos'
+                      ? 'border-[var(--primary)] text-[var(--primary)]'
+                      : 'border-transparent text-[var(--text-sec)] hover:text-[var(--text-main)]'
+                  }`}
+                  onClick={() => setSpecificDetailTab('abonos')}
+                >
+                  <History size={16} />
+                  Historial de Abonos
+                </button>
+                <button
+                  className={`flex-1 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-colors flex items-center justify-center gap-2 ${
+                    specificDetailTab === 'documentos'
+                      ? 'border-[var(--primary)] text-[var(--primary)]'
+                      : 'border-transparent text-[var(--text-sec)] hover:text-[var(--text-main)]'
+                  }`}
+                  onClick={() => setSpecificDetailTab('documentos')}
+                >
+                  <FileText size={16} />
+                  Documentos Formales
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 custom-scrollbar min-h-0">
+                {specificDetailTab === 'abonos' ? (
                   <div className="border rounded-xl overflow-hidden shadow-sm bg-[var(--card)]">
                     <Table>
                       <TableHeader>
@@ -613,12 +721,13 @@ export function Credit() {
                           <TableHead>Referencia</TableHead>
                           <TableHead>Registrado por</TableHead>
                           <TableHead className="text-right">Monto</TableHead>
+                          <TableHead className="text-center w-[80px]">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {specificPayments.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                            <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
                               No hay abonos registrados
                             </TableCell>
                           </TableRow>
@@ -631,6 +740,11 @@ export function Credit() {
                               <TableCell>{p.user?.fullName || '-'}</TableCell>
                               <TableCell className="text-right font-bold text-emerald-600">
                                 ${Number(p.amount).toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDetail(p)} className="text-[var(--primary)] hover:bg-[var(--primary)]/10" title="Ver Detalle de Abono">
+                                  <FileText size={16} />
+                                </Button>
                               </TableCell>
                             </TableRow>
                           ))
@@ -661,10 +775,270 @@ export function Credit() {
                       </div>
                     )}
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold text-lg flex items-center gap-2">
+                        <FileText size={18} /> Documentos Solicitados
+                      </h3>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAddDocModalOpen(true)}
+                        className="gap-1 font-bold"
+                      >
+                        <Plus size={14} /> Solicitar Documento
+                      </Button>
+                    </div>
+
+                    {loadingDocs ? (
+                      <p className="text-sm text-[var(--text-sec)] animate-pulse">Cargando documentos...</p>
+                    ) : creditDocuments.length === 0 ? (
+                      <div className="border rounded-xl p-6 text-center text-[var(--text-sec)] bg-[var(--bg)]/50">
+                        <FileText size={28} className="mx-auto mb-2 opacity-30" />
+                        <p className="text-sm font-medium">No hay documentos solicitados para este crédito</p>
+                      </div>
+                    ) : (
+                      <div className="border rounded-xl overflow-hidden shadow-sm bg-[var(--card)]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Tipo</TableHead>
+                              <TableHead>Nombre</TableHead>
+                              <TableHead>Estado</TableHead>
+                              <TableHead>Notas</TableHead>
+                              <TableHead>Solicitado</TableHead>
+                              <TableHead className="text-center">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {creditDocuments.map(doc => (
+                              <TableRow key={doc.id}>
+                                <TableCell>
+                                  <Badge variant="secondary" className="text-xs font-bold">
+                                    {doc.documentType.replace(/_/g, ' ')}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-medium text-sm">{doc.documentName}</TableCell>
+                                <TableCell>
+                                  {doc.status === 'RECIBIDO' && (
+                                    <Badge variant="success">Recibido</Badge>
+                                  )}
+                                  {doc.status === 'SOLICITADO' && (
+                                    <Badge variant="warning">Solicitado</Badge>
+                                  )}
+                                  {doc.status === 'RECHAZADO' && (
+                                    <Badge variant="destructive">Rechazado</Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-xs text-[var(--text-sec)] max-w-[160px] truncate">
+                                  {doc.notes || '-'}
+                                </TableCell>
+                                <TableCell className="text-xs text-[var(--text-sec)]">
+                                  {new Date(doc.requestedAt).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <div className="flex justify-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      title="Cambiar estado"
+                                      onClick={() => handleToggleDocStatus(doc)}
+                                      className="text-[var(--primary)] hover:bg-[var(--primary)]/10"
+                                    >
+                                      <RefreshCcw size={14} />
+                                    </Button>
+                                    {doc.status === 'SOLICITADO' && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        title="Eliminar"
+                                        onClick={() => handleDeleteDoc(doc.id)}
+                                        className="text-rose-500 hover:bg-rose-500/10"
+                                      >
+                                        <Trash2 size={14} />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* DETALLE DE ABONO (TIPO FACTURA) */}
+      <Dialog open={paymentDetailModalOpen} onOpenChange={setPaymentDetailModalOpen}>
+        <DialogContent 
+          className="flex flex-col p-0 overflow-hidden bg-[var(--card)] border-[var(--border)]"
+          style={{ maxWidth: '600px', width: '90vw', maxHeight: '90vh' }}
+        >
+          {selectedPaymentDetail && (
+            <>
+              <div className="p-6 border-b border-[var(--border)] bg-[var(--bg)]/50 relative">
+                <div className="flex items-start gap-4">
+                  <div className="size-12 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                    <FileText size={24} />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-black text-[var(--text-main)] uppercase tracking-wide">
+                      Detalle de Abono
+                    </DialogTitle>
+                    <DialogDescription className="text-sm font-mono text-[var(--text-sec)]">
+                      COMPROBANTE #{selectedPaymentDetail.id.toString().padStart(6, '0')}
+                    </DialogDescription>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto min-h-0 p-6">
+                <div className="space-y-8">
+                  {/* ESTADO BANNER */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="text-emerald-500" size={24} />
+                      <div>
+                        <p className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-wider">Estado del Abono</p>
+                        <p className="text-sm font-black uppercase text-emerald-600">
+                          PROCESADO
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right mt-4 sm:mt-0">
+                      <p className="text-sm font-bold text-[var(--text-main)]">
+                        {new Date(selectedPaymentDetail.createdAt).toLocaleString('es-ES')}
+                      </p>
+                      <p className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-wider">Fecha Registro</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-8">
+                    {/* DATOS DEL PAGO */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2">
+                        <DollarSign size={16} className="text-[var(--text-sec)]" />
+                        <h3 className="text-xs font-black text-[var(--text-sec)] uppercase tracking-widest">Información del Pago</h3>
+                      </div>
+                      
+                      <div className="bg-[var(--bg)] rounded-xl border border-[var(--border)] p-4 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-sec)] uppercase tracking-wider mb-1">Método de Pago</p>
+                            <p className="font-bold text-[var(--text-main)] uppercase">{selectedPaymentDetail.paymentMethod}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-sec)] uppercase tracking-wider mb-1">Referencia</p>
+                            <p className="font-medium text-[var(--text-main)] text-sm">{selectedPaymentDetail.reference || 'S/N'}</p>
+                          </div>
+                        </div>
+                        <div className="border-t border-[var(--border)] pt-4">
+                          <p className="text-[10px] font-bold text-[var(--text-sec)] uppercase tracking-wider mb-1">Notas / Observaciones</p>
+                          <p className="font-medium text-[var(--text-main)] text-sm">{selectedPaymentDetail.notes || 'Ninguna'}</p>
+                        </div>
+                        <div className="border-t border-[var(--border)] pt-4">
+                          <p className="text-[10px] font-bold text-[var(--text-sec)] uppercase tracking-wider mb-1">Registrado Por</p>
+                          <p className="font-medium text-[var(--text-main)] text-sm">{selectedPaymentDetail.user?.fullName || 'Sistema'}</p>
+                        </div>
+                        <div className="border-t border-[var(--border)] pt-4 flex justify-between items-center">
+                          <p className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-widest">Total Abonado</p>
+                          <p className="text-xl font-black text-emerald-600">${Number(selectedPaymentDetail.amount).toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-4 border-t border-[var(--border)] bg-[var(--bg)]/50 flex justify-end">
+                <Button onClick={() => setPaymentDetailModalOpen(false)} variant="outline" className="font-bold px-8">
+                  CERRAR DETALLE
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL: AGREGAR DOCUMENTO */}
+      <Dialog open={addDocModalOpen} onOpenChange={setAddDocModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Solicitar Documento</DialogTitle>
+            <DialogDescription>
+              Registra un documento requerido para formalizar este crédito.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Tipo de Documento</Label>
+              <Select
+                value={newDoc.documentType}
+                onValueChange={(v: any) => setNewDoc({ ...newDoc, documentType: v })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DUI">DUI (Documento Único de Identidad)</SelectItem>
+                  <SelectItem value="NIT">NIT</SelectItem>
+                  <SelectItem value="COMPROBANTE_INGRESOS">Comprobante de Ingresos</SelectItem>
+                  <SelectItem value="RECIBO_SERVICIOS">Recibo de Servicios (luz/agua)</SelectItem>
+                  <SelectItem value="CARTA_TRABAJO">Carta de Trabajo</SelectItem>
+                  <SelectItem value="ESTADO_CUENTA_BANCO">Estado de Cuenta Bancario</SelectItem>
+                  <SelectItem value="ESCRITURA_PROPIEDAD">Escritura de Propiedad</SelectItem>
+                  <SelectItem value="FIADOR">Fiador</SelectItem>
+                  <SelectItem value="REFERENCIA_COMERCIAL">Referencia Comercial</SelectItem>
+                  <SelectItem value="FOTO_NEGOCIO">Foto del Negocio</SelectItem>
+                  <SelectItem value="OTRO">Otro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Nombre o Descripción del Documento</Label>
+              <Input
+                placeholder="Ej. DUI titular del crédito"
+                value={newDoc.documentName}
+                onChange={e => setNewDoc({ ...newDoc, documentName: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Estado Inicial</Label>
+              <Select
+                value={newDoc.status}
+                onValueChange={(v: any) => setNewDoc({ ...newDoc, status: v })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SOLICITADO">Solicitado (pendiente de recibir)</SelectItem>
+                  <SelectItem value="RECIBIDO">Recibido (ya lo tengo)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notas (Opcional)</Label>
+              <Input
+                placeholder="Ej. Enviar copia y original"
+                value={newDoc.notes || ''}
+                onChange={e => setNewDoc({ ...newDoc, notes: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDocModalOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={handleSaveDoc}
+              disabled={savingDoc}
+              style={{ backgroundColor: 'var(--primary)', color: '#fff' }}
+            >
+              {savingDoc ? 'Guardando...' : 'Solicitar Documento'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
