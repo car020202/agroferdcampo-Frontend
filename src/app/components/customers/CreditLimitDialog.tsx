@@ -76,10 +76,8 @@ export function CreditLimitDialog({ open, onOpenChange, customer, onSuccess }: C
     }
   };
 
-  const handleToggleDocStatus = async (doc: CreditDocument) => {
-    const nextStatus: CreditDocumentStatus =
-      doc.status === 'SOLICITADO' ? 'RECIBIDO' :
-      doc.status === 'RECIBIDO' ? 'RECHAZADO' : 'SOLICITADO';
+  const handleSetDocStatus = async (doc: CreditDocument, nextStatus: CreditDocumentStatus) => {
+    if (doc.status === nextStatus) return;
     try {
       await creditService.updateDocument(doc.id, {
         status: nextStatus,
@@ -259,11 +257,10 @@ export function CreditLimitDialog({ open, onOpenChange, customer, onSuccess }: C
               <div className="border rounded-xl overflow-hidden shadow-sm bg-[var(--card)]">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Documento</TableHead>
-                      <TableHead className="text-xs">Estado</TableHead>
-                      <TableHead className="text-xs text-right">Acciones</TableHead>
-                    </TableRow>
+                      <TableRow>
+                        <TableHead className="text-xs">Documento</TableHead>
+                        <TableHead className="text-xs">Estado</TableHead>
+                      </TableRow>
                   </TableHeader>
                   <TableBody>
                     {docs.map(doc => (
@@ -273,19 +270,30 @@ export function CreditLimitDialog({ open, onOpenChange, customer, onSuccess }: C
                           <span className="text-[10px] text-[var(--text-sec)] uppercase tracking-wider">{doc.documentType}</span>
                         </TableCell>
                         <TableCell>
-                          {doc.status === 'RECIBIDO' && <Badge variant="success" className="text-[10px]">Recibido</Badge>}
-                          {doc.status === 'SOLICITADO' && <Badge variant="warning" className="text-[10px]">Solicitado</Badge>}
-                          {doc.status === 'RECHAZADO' && <Badge variant="destructive" className="text-[10px]">Rechazado</Badge>}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 mr-1" onClick={() => handleToggleDocStatus(doc)} title="Cambiar estado">
-                            <RefreshCcw size={12} />
-                          </Button>
-                          {doc.status === 'SOLICITADO' && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-rose-500 hover:bg-rose-500/10" onClick={() => handleDeleteDoc(doc.id)} title="Eliminar">
-                              <Trash2 size={12} />
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <Select 
+                              value={doc.status} 
+                              onValueChange={(val: any) => handleSetDocStatus(doc, val)}
+                            >
+                              <SelectTrigger className={`h-7 text-[10px] font-bold w-[110px] ${
+                                  doc.status === 'RECIBIDO' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                  doc.status === 'SOLICITADO' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                  'bg-rose-50 text-rose-600 border-rose-200'
+                                }`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="SOLICITADO" className="text-[10px] font-bold text-amber-600">SOLICITADO</SelectItem>
+                                <SelectItem value="RECIBIDO" className="text-[10px] font-bold text-emerald-600">RECIBIDO</SelectItem>
+                                <SelectItem value="RECHAZADO" className="text-[10px] font-bold text-rose-600">RECHAZADO</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {doc.status === 'SOLICITADO' && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-rose-500 hover:bg-rose-500/10" onClick={() => handleDeleteDoc(doc.id)} title="Eliminar">
+                                <Trash2 size={12} />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
