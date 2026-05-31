@@ -250,7 +250,7 @@ export function Finance() {
     }
   };
 
-  const isPettyLow = pettyStatus ? pettyStatus.currentBalance <= pettyStatus.minBalance : false;
+  const isPettyLow = pettyStatus?.needsReplenishment ?? false;
 
   return (
     <div className="flex flex-col gap-6 h-full">
@@ -348,7 +348,7 @@ export function Finance() {
                 ) : (
                   generalMovements.map(m => (
                     <TableRow key={m.id}>
-                      <TableCell>{new Date(m.createdAt).toLocaleString()}</TableCell>
+                      <TableCell>{new Date(m.date || m.createdAt).toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge variant={m.type === 'INGRESO' ? 'success' : 'destructive'}>{m.type}</Badge>
                       </TableCell>
@@ -371,7 +371,11 @@ export function Finance() {
 
       {activeTab === 'petty' && (
         <div className="flex flex-col gap-6">
-          {!pettyStatus ? (
+          {pettyLoading ? (
+            <div className="flex items-center justify-center h-40 text-[var(--text-sec)]">
+              Cargando caja chica...
+            </div>
+          ) : !pettyStatus ? (
             <Card className="p-8 text-center flex flex-col items-center gap-4 bg-[var(--card)] border-[var(--border)] shadow-sm">
               <Wallet size={48} className="text-[var(--text-sec)] opacity-50" />
               <div>
@@ -387,13 +391,13 @@ export function Finance() {
                 <Card className="p-6 bg-[var(--card)] border-[var(--border)] shadow-sm">
                   <h3 className="text-sm font-bold text-[var(--text-sec)] mb-2">Saldo Actual</h3>
                   <p className={`text-3xl font-black ${isPettyLow ? 'text-amber-500' : 'text-[var(--primary)]'}`}>
-                    ${pettyStatus.currentBalance.toFixed(2)}
+                    ${Number(pettyStatus.currentBalance).toFixed(2)}
                   </p>
                   {isPettyLow && <p className="text-xs text-amber-500 font-bold mt-1">Saldo bajo mínimo</p>}
                 </Card>
                 <Card className="p-6 bg-[var(--card)] border-[var(--border)] shadow-sm">
                   <h3 className="text-sm font-bold text-[var(--text-sec)] mb-2">Límite Máximo</h3>
-                  <p className="text-3xl font-black text-[var(--text-main)]">${pettyStatus.maxBalance.toFixed(2)}</p>
+                  <p className="text-3xl font-black text-[var(--text-main)]">${Number(pettyStatus.maxBalance).toFixed(2)}</p>
                 </Card>
               </div>
 
@@ -401,11 +405,13 @@ export function Finance() {
                 <Button onClick={() => setShowExpenseModal(true)} variant="destructive" className="font-bold">
                   Registrar Gasto (Egreso)
                 </Button>
-                {isPettyLow && (
-                  <Button onClick={() => setShowReplenishModal(true)} variant="outline" className="border-amber-500 text-amber-600">
-                    Solicitar Reposición
-                  </Button>
-                )}
+                <Button 
+                  onClick={() => setShowReplenishModal(true)} 
+                  variant="outline" 
+                  className={isPettyLow ? 'border-amber-500 text-amber-600' : ''}
+                >
+                  Solicitar Reposición
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -516,6 +522,16 @@ export function Finance() {
             <div className="space-y-2">
               <label className="text-sm font-bold">Descripción</label>
               <Input value={newGeneralEntry.description} onChange={e => setNewGeneralEntry({...newGeneralEntry, description: e.target.value})} placeholder="Ej. Pago de luz" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold">
+                Referencia <span className="font-normal text-[var(--text-sec)]">(Opcional — Nº factura, recibo)</span>
+              </label>
+              <Input
+                value={newGeneralEntry.reference}
+                onChange={e => setNewGeneralEntry({...newGeneralEntry, reference: e.target.value})}
+                placeholder="Ej. FAC-2026-00123"
+              />
             </div>
             {newGeneralEntry.category === 'PAGO_PROVEEDOR' && (
               <div className="space-y-2">

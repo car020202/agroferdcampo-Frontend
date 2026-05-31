@@ -7,6 +7,15 @@ export interface PettyCashStatus {
   currentBalance: number;
   maxBalance: number;
   minBalance: number;
+  needsReplenishment: boolean;
+  lastMovement?: {
+    id: number;
+    type: 'INGRESO' | 'EGRESO';
+    amount: number;
+    description: string;
+    createdAt: string;
+    user: { id: number; fullName: string };
+  };
 }
 
 export interface PettyCashMovement {
