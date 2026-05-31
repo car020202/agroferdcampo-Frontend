@@ -7,6 +7,7 @@ export interface CashShift {
   id: number;
   userId: number;
   branchId: number;
+  cashRegisterId?: number;
   openedAt: string;
   closedAt: string | null;
   initialAmount: number;
@@ -16,6 +17,16 @@ export interface CashShift {
   openingNotes: string | null;
   notes: string | null;
   status: 'ABIERTO' | 'CERRADO';
+  cashRegister?: CashRegister;
+}
+
+export interface CashRegister {
+  id: number;
+  branchId: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CloseShiftResponse {
@@ -43,6 +54,7 @@ export interface DenominationBreakdown {
 }
 
 export interface OpenShiftPayload {
+  cashRegisterId?: number;
   breakdown: DenominationBreakdown;
   notes?: string;
 }
@@ -59,6 +71,11 @@ export interface ExpectedTotals {
 }
 
 export const cashShiftsService = {
+  getAvailableRegisters: async (branchId?: number): Promise<CashRegister[]> => {
+    const url = branchId ? `${BASE}/available-registers?branchId=${branchId}` : `${BASE}/available-registers`;
+    return await apiRequest<CashRegister[]>(url);
+  },
+
   openShift: async (payload: OpenShiftPayload): Promise<CashShift> => {
     return await apiRequest<CashShift>(`${BASE}/open`, {
       method: 'POST',

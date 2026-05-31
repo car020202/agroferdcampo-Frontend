@@ -1,4 +1,4 @@
-import { Settings as SettingsIcon, Building2, Users, Receipt, Bell, Palette } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, Users, Receipt, Bell, Palette, Monitor } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router';
@@ -20,6 +20,14 @@ const SETTINGS_SECTIONS = [
     icon: Building2,
     adminOnly: false,
     path: '/settings/branches',
+  },
+  {
+    id: 'cash-registers',
+    title: 'Cajas Físicas',
+    description: 'Gestionar terminales de punto de venta',
+    icon: Monitor,
+    adminOnly: true,
+    path: '/settings/cash-registers',
   },
   {
     id: '2',

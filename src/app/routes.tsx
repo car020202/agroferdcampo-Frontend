@@ -15,6 +15,7 @@ import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
 import { ThemeCustomizer } from "./pages/ThemeCustomizer";
 import { Branches as BranchesPage } from "./pages/Branches";
+import { CashRegisters } from "./pages/CashRegisters";
 import { HumanResources } from "./pages/HumanResources";
 import { Catalog } from "./pages/Catalog";
 import { UIComponentsShowcase } from "./pages/UIComponentsShowcase";
@@ -122,6 +123,10 @@ export const router = createBrowserRouter([
       {
         path: "settings/branches",
         element: <BranchesPage />,
+      },
+      {
+        path: "settings/cash-registers",
+        element: <CashRegisters />,
       },
       {
         path: "settings/global",

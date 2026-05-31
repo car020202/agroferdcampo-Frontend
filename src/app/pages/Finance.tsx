@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
 import { 
   Wallet, DollarSign, TrendingUp, Search, 
-  ArrowDownCircle, ArrowUpCircle, Filter, CheckCircle2, XCircle, Clock
+  ArrowDownCircle, ArrowUpCircle, Filter, CheckCircle2, XCircle, Clock, FileDown, FileSpreadsheet, FileText
 } from 'lucide-react';
 import { 
   generalCashService, GeneralCashEntry, GeneralCashSummary 
 } from '../services/general-cash.service';
-import { 
-  pettyCashService, PettyCashStatus, PettyCashMovement, PettyCashReplenishment 
-} from '../services/petty-cash.service';
+import { pettyCashService, PettyCashStatus, PettyCashMovement, PettyCashReplenishment } from '../services/petty-cash.service';
 import { cashShiftsService } from '../services/cash-shifts.service';
+import { reportsService } from '../services/reports.service';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
@@ -41,7 +40,7 @@ const financeFilters: FilterConfig[] = [
 
 export function Finance() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'general' | 'petty'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'petty' | 'shifts'>('general');
 
   // --- SHIFT STATE ---
   const [hasActiveShift, setHasActiveShift] = useState(false);
@@ -103,13 +102,20 @@ export function Finance() {
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [setupForm, setSetupForm] = useState({ maxBalance: '', minBalance: '' });
 
+  // --- SHIFTS HISTORY STATE ---
+  const [shiftsHistory, setShiftsHistory] = useState<any[]>([]);
+  const [shiftsLoading, setShiftsLoading] = useState(false);
+  const [shiftsPagination, setShiftsPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
+
   useEffect(() => {
     if (activeTab === 'general') {
       fetchGeneralCash();
-    } else {
+    } else if (activeTab === 'petty') {
       fetchPettyCash();
+    } else if (activeTab === 'shifts') {
+      fetchShiftsHistory();
     }
-  }, [activeTab, generalFilters.page, generalFilters.category, typeFilter, categoryFilter, startDateFilter, endDateFilter]);
+  }, [activeTab, generalFilters.page, generalFilters.category, typeFilter, categoryFilter, startDateFilter, endDateFilter, shiftsPagination.page]);
 
   useEffect(() => {
     if (newGeneralEntry.category === 'PAGO_PROVEEDOR') {
@@ -198,6 +204,38 @@ export function Finance() {
       }
     } finally {
       setPettyLoading(false);
+    }
+  };
+
+  // --- SHIFTS HISTORY LOGIC ---
+  const fetchShiftsHistory = async () => {
+    setShiftsLoading(true);
+    try {
+      const res = await reportsService.getCashShiftsHistory(shiftsPagination.page, shiftsPagination.limit);
+      setShiftsHistory(res.data);
+      setShiftsPagination(prev => ({ ...prev, total: res.total, totalPages: res.totalPages }));
+    } catch (error: any) {
+      toast.error('Error al cargar historial de turnos');
+    } finally {
+      setShiftsLoading(false);
+    }
+  };
+
+  const handleExportShiftPdf = async (id: number) => {
+    try {
+      await reportsService.downloadReport(`cash-shifts/${id}/export/pdf`, `cierre-turno-${id}.pdf`);
+      toast.success('Reporte exportado correctamente');
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleExportShiftExcel = async (id: number) => {
+    try {
+      await reportsService.downloadReport(`cash-shifts/${id}/export/excel`, `cierre-turno-${id}.xlsx`);
+      toast.success('Reporte exportado correctamente');
+    } catch (error: any) {
+      toast.error(error.message);
     }
   };
 
@@ -295,6 +333,14 @@ export function Finance() {
           }`}
         >
           Caja Chica
+        </button>
+        <button
+          onClick={() => setActiveTab('shifts')}
+          className={`px-6 py-3 font-bold text-sm transition-all border-b-2 -mb-[2px] cursor-pointer ${
+            activeTab === 'shifts' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-[var(--text-sec)]'
+          }`}
+        >
+          Turnos de Caja
         </button>
       </div>
 
@@ -503,6 +549,108 @@ export function Finance() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* SHIFTS TAB */}
+      {activeTab === 'shifts' && (
+        <div className="flex flex-col gap-6">
+          <Card className="bg-[var(--card)] border-[var(--border)] shadow-sm flex flex-col">
+            <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+              <span className="font-bold">Historial de Turnos de Caja</span>
+            </div>
+            <div className="p-0 flex-1 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cajero</TableHead>
+                    <TableHead>Caja Fís.</TableHead>
+                    <TableHead>Apertura / Cierre</TableHead>
+                    <TableHead className="text-right">Inicial</TableHead>
+                    <TableHead className="text-right">Esperado</TableHead>
+                    <TableHead className="text-right">Diferencia</TableHead>
+                    <TableHead className="text-center">Estado</TableHead>
+                    <TableHead className="text-center">Exportar</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shiftsLoading ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando...</TableCell></TableRow>
+                  ) : shiftsHistory.length === 0 ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8">No hay turnos registrados</TableCell></TableRow>
+                  ) : (
+                    shiftsHistory.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-bold text-[var(--text-main)]">
+                          {s.user?.fullName || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {s.cashRegister ? s.cashRegister.name : <span className="text-[var(--text-sec)]">-</span>}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <div className="text-emerald-600 font-bold whitespace-nowrap">Ap: {new Date(s.openedAt).toLocaleString()}</div>
+                          {s.closedAt ? (
+                            <div className="text-rose-600 font-bold whitespace-nowrap">Ci: {new Date(s.closedAt).toLocaleString()}</div>
+                          ) : (
+                            <div className="text-amber-500 font-bold">En curso</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">${Number(s.initialAmount).toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{s.expectedAmount !== null ? `$${Number(s.expectedAmount).toFixed(2)}` : '-'}</TableCell>
+                        <TableCell className={`text-right font-bold ${Number(s.difference) < 0 ? 'text-rose-500' : Number(s.difference) > 0 ? 'text-emerald-500' : 'text-[var(--text-sec)]'}`}>
+                          {s.difference !== null ? `$${Number(s.difference).toFixed(2)}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={s.status === 'ABIERTO' ? 'default' : 'secondary'}>
+                            {s.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {s.status === 'CERRADO' ? (
+                            <div className="flex gap-2 justify-center">
+                              <Button variant="ghost" size="icon" onClick={() => handleExportShiftPdf(s.id)} title="Exportar PDF">
+                                <FileText size={18} className="text-rose-500" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleExportShiftExcel(s.id)} title="Exportar Excel">
+                                <FileSpreadsheet size={18} className="text-emerald-500" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-[var(--text-sec)]">Pendiente</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            
+            {/* Pagination */}
+            {shiftsPagination.totalPages > 1 && (
+              <div className="p-4 border-t border-[var(--border)] flex justify-between items-center text-sm font-bold">
+                <span className="text-[var(--text-sec)]">
+                  Página {shiftsPagination.page} de {shiftsPagination.totalPages} ({shiftsPagination.total} turnos)
+                </span>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    disabled={shiftsPagination.page === 1}
+                    onClick={() => setShiftsPagination(p => ({ ...p, page: p.page - 1 }))}
+                  >
+                    Anterior
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    disabled={shiftsPagination.page === shiftsPagination.totalPages}
+                    onClick={() => setShiftsPagination(p => ({ ...p, page: p.page + 1 }))}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Card>
         </div>
       )}
 

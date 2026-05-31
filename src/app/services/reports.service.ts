@@ -179,6 +179,10 @@ export const reportsService = {
     return await apiRequest<any[]>(`/reports/cash/detail?${params.toString()}`);
   },
 
+  getCashShiftsHistory: async (page: number = 1, limit: number = 20): Promise<{ data: any[], total: number, page: number, totalPages: number }> => {
+    return await apiRequest<{ data: any[], total: number, page: number, totalPages: number }>(`/cash-shifts?page=${page}&limit=${limit}`);
+  },
+
   downloadReport: async (endpointPath: string, filename: string): Promise<void> => {
     const token = localStorage.getItem('agro-token');
 

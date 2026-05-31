@@ -25,6 +25,7 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Calendar } from "../components/ui/calendar";
 import { apiRequest } from "../config/api";
 import { createSale, sendFacturaConsumidor, sendCreditoFiscal } from "../services/sales.service";
@@ -186,10 +187,14 @@ export function POS() {
 
   // New Checkout States
   const [processingOverlay, setProcessingOverlay] = useState(false);
+  const [showMixedPaymentModal, setShowMixedPaymentModal] = useState(false);
+  const [payments, setPayments] = useState<{ paymentMethod: 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'CREDITO'; amount: number; reference?: string }[]>([]);
 
   // Cash Shift States
   const [activeShift, setActiveShift] = useState<CashShift | null>(null);
   const [loadingShift, setLoadingShift] = useState(true);
+  const [availableRegisters, setAvailableRegisters] = useState<any[]>([]);
+  const [selectedRegisterId, setSelectedRegisterId] = useState<string>("");
   const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
   const [openBills, setOpenBills] = useState<BillsBreakdown>({ d100:0, d50:0, d20:0, d10:0, d5:0, d1:0 });
   const [openCoins, setOpenCoins] = useState<CoinsBreakdown>({ c25:0, c10:0, c5:0, c1:0 });
@@ -268,6 +273,12 @@ export function POS() {
         setShowOpenShiftModal(false);
       } else {
         setActiveShift(null);
+        try {
+          const registers = await cashShiftsService.getAvailableRegisters();
+          setAvailableRegisters(registers);
+        } catch (err) {
+          console.error("Error fetching registers:", err);
+        }
         setShowOpenShiftModal(true);
       }
     } catch (error) {
@@ -278,6 +289,10 @@ export function POS() {
   };
 
   const handleOpenShift = async () => {
+    if (!selectedRegisterId) {
+      toast.error("Debe seleccionar una caja para iniciar turno");
+      return;
+    }
     const total = calcBreakdownTotal(openBills, openCoins);
     if (total <= 0) {
       toast.error("El desglose debe sumar al menos $0.01");
@@ -287,6 +302,7 @@ export function POS() {
     try {
       setLoadingShift(true);
       const shift = await cashShiftsService.openShift({ 
+        cashRegisterId: Number(selectedRegisterId),
         breakdown: { bills: openBills, coins: openCoins },
         notes: openNotes || undefined
       });
@@ -296,6 +312,7 @@ export function POS() {
       setOpenBills({ d100:0, d50:0, d20:0, d10:0, d5:0, d1:0 });
       setOpenCoins({ c25:0, c10:0, c5:0, c1:0 });
       setOpenNotes("");
+      setSelectedRegisterId("");
       toast.success("Caja abierta exitosamente");
     } catch (error: any) {
       toast.error(error.message || "Error al abrir caja");
@@ -352,8 +369,6 @@ export function POS() {
     isSubmittingRef.current = true;
     if (quoteBtnRef.current) {
       quoteBtnRef.current.disabled = true;
-      quoteBtnRef.current.style.pointerEvents = 'none';
-      quoteBtnRef.current.style.opacity = '0.6';
     }
     setProcessingOverlay(true);
     setLoading(true);
@@ -388,8 +403,6 @@ export function POS() {
       // Si falla, rehabilitar el botón para que el cajero corrija y reintente
       if (quoteBtnRef.current) {
         quoteBtnRef.current.disabled = false;
-        quoteBtnRef.current.style.pointerEvents = '';
-        quoteBtnRef.current.style.opacity = '';
       }
     } finally {
       // Siempre liberar el lock al terminar
@@ -592,9 +605,8 @@ export function POS() {
     iva = subtotal * vatRate;
   }
 
-  const handleCheckout = async () => {
+  const handleCheckoutClick = () => {
     if (cart.length === 0) return;
-    if (isCheckoutSubmittingGlobal) return;
 
     if (selectedPayment === "CREDITO") {
       if (!selectedCustomer) {
@@ -615,13 +627,24 @@ export function POS() {
       }
     }
 
+    setPayments([{ paymentMethod: selectedPayment, amount: total }]);
+    setShowMixedPaymentModal(true);
+  };
+
+  const processSale = async () => {
+    if (cart.length === 0) return;
+    // Validación extra: suma de pagos debe cuadrar con el total
+    const sumPayments = payments.reduce((sum, p) => sum + p.amount, 0);
+    if (Math.abs(sumPayments - total) > 0.01) {
+      toast.error(`La suma de los pagos ($${sumPayments.toFixed(2)}) no coincide con el total ($${total.toFixed(2)})`);
+      return;
+    }
+
     // Bloquear el botón a nivel DOM ANTES de cualquier código asíncrono
     isCheckoutSubmittingGlobal = true;
     isSubmittingRef.current = true;
     if (checkoutBtnRef.current) {
       checkoutBtnRef.current.disabled = true;
-      checkoutBtnRef.current.style.pointerEvents = 'none';
-      checkoutBtnRef.current.style.opacity = '0.6';
     }
     setProcessingOverlay(true);
     setLoading(true);
@@ -629,10 +652,11 @@ export function POS() {
     try {
       await createSale({
         customerId: selectedCustomer?.id,
-        paymentMethod: selectedPayment,
+        paymentMethod: payments[0]?.paymentMethod || 'EFECTIVO',
+        payments: payments,
         totalAmount: total,
         taxAmount: iva,
-        dueDate: selectedPayment === "CREDITO" && checkoutDueDate ? checkoutDueDate : undefined,
+        dueDate: payments.some(p => p.paymentMethod === "CREDITO") && checkoutDueDate ? checkoutDueDate : undefined,
         items: cart.map((i) => ({
           productId: i.id,
           quantity: i.quantity,
@@ -662,6 +686,7 @@ export function POS() {
       setSelectedCustomer(null);
       setCheckoutDueDate("");
       setTransportData(null);
+      setShowMixedPaymentModal(false);
 
     } catch (error: any) {
       const msg = error.message || "Error al procesar la venta. Verifique el stock.";
@@ -676,8 +701,6 @@ export function POS() {
       // Si falla, rehabilitar el botón para que el cajero corrija y reintente
       if (checkoutBtnRef.current) {
         checkoutBtnRef.current.disabled = false;
-        checkoutBtnRef.current.style.pointerEvents = '';
-        checkoutBtnRef.current.style.opacity = '';
       }
     } finally {
       // Siempre liberar el lock al terminar
@@ -704,7 +727,7 @@ export function POS() {
             className="border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 font-bold hover:border-red-300"
             onClick={handleOpenCloseShiftModal}
           >
-            <Lock size={14} className="mr-2" /> Cerrar Caja
+            <Lock size={14} className="mr-2" /> Cerrar Caja ({activeShift.cashRegister?.name || 'Caja Activa'})
           </Button>
         )}
       </div>
@@ -914,10 +937,11 @@ export function POS() {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-1.5">
-              {["EFECTIVO", "TARJETA", "TRANSFERENCIA", "CREDITO"]
+            <div className="grid grid-cols-5 gap-1.5">
+              {["EFECTIVO", "TARJETA", "TRANSFERENCIA", "CREDITO", "MIXTO"]
                 .filter((method) => {
                   if (method === "CREDITO" && sysConfig?.allowCreditSales === false) return false;
+                  if (method === "MIXTO") return true;
                   if (!branchPaymentConfig) return true;
                   if (method === "EFECTIVO" && !branchPaymentConfig.acceptsCash) return false;
                   if (method === "TARJETA" && !branchPaymentConfig.acceptsCard) return false;
@@ -928,12 +952,24 @@ export function POS() {
                 .map((method) => (
                   <Button
                     key={method}
-                    variant={selectedPayment === method ? "default" : "outline"}
+                    variant={(selectedPayment as string) === method && method !== "MIXTO" ? "default" : "outline"}
                     className={cn(
                       "h-8 text-[9px] font-black tracking-tight px-0",
-                      selectedPayment === method ? "bg-[var(--primary)] text-white shadow-sm" : "bg-[var(--bg)] text-[var(--text-sec)]"
+                      (selectedPayment as string) === method && method !== "MIXTO" ? "bg-[var(--primary)] text-white shadow-sm" : 
+                      method === "MIXTO" ? "border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white" :
+                      "bg-[var(--bg)] text-[var(--text-sec)]"
                     )}
-                    onClick={() => setSelectedPayment(method as any)}
+                    onClick={() => {
+                      if (method === "MIXTO") {
+                        if (cart.length === 0) {
+                          toast.error("Agregue productos al carrito para usar pago mixto");
+                          return;
+                        }
+                        if (!isCheckoutSubmittingGlobal) handleCheckoutClick();
+                      } else {
+                        setSelectedPayment(method as any);
+                      }
+                    }}
                   >
                     {method}
                   </Button>
@@ -964,7 +1000,7 @@ export function POS() {
               </Button>
               <Button
                 ref={checkoutBtnRef}
-                onPointerDown={() => { if (!isCheckoutSubmittingGlobal) handleCheckout(); }}
+                onClick={() => { if (!isCheckoutSubmittingGlobal) handleCheckoutClick(); }}
                 disabled={loading || cart.length === 0}
                 className="h-12 rounded-xl font-black text-sm bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90"
               >
@@ -1012,12 +1048,29 @@ export function POS() {
                 Apertura de Caja
               </DialogTitle>
               <DialogDescription className="text-sm sm:text-base font-medium opacity-80 mt-1">
-                Ingresa el efectivo inicial contando los billetes y monedas disponibles.
+                Selecciona la caja física e ingresa el efectivo inicial contando los billetes y monedas disponibles.
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="p-4 sm:p-6 pt-4 space-y-4 sm:space-y-6 overflow-y-auto flex-1">
+            <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm flex flex-col space-y-2">
+              <label className="text-sm font-bold text-[var(--text-main)]">Caja a utilizar</label>
+              <Select value={selectedRegisterId} onValueChange={setSelectedRegisterId}>
+                <SelectTrigger className="w-full h-12 bg-[var(--bg)] border-[var(--border)] rounded-xl font-bold">
+                  <SelectValue placeholder="Seleccione una caja..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRegisters.map(reg => (
+                    <SelectItem key={reg.id} value={reg.id.toString()}>{reg.name}</SelectItem>
+                  ))}
+                  {availableRegisters.length === 0 && (
+                    <div className="p-2 text-sm text-[var(--text-sec)]">No hay cajas disponibles</div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {/* BILLETES */}
               <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-md transition-shadow">
@@ -1354,7 +1407,7 @@ export function POS() {
             <Button variant="outline" onClick={() => setShowQuoteModal(false)}>Cancelar</Button>
             <Button
               ref={quoteBtnRef}
-              onPointerDown={() => {
+              onClick={() => {
                 if (!isQuoteSubmittingGlobal) handleSaveQuote();
               }}
               disabled={loading || quoteValidDays === ""}
@@ -1387,6 +1440,143 @@ export function POS() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Cobro Mixto */}
+      <Dialog open={showMixedPaymentModal} onOpenChange={setShowMixedPaymentModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black flex items-center gap-2">
+              <DollarSign className="text-[var(--primary)]" size={28} />
+              Confirmar Cobro
+            </DialogTitle>
+            <DialogDescription>
+              Verifique o divida el pago en múltiples métodos.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div className="flex justify-between items-center p-4 bg-[var(--card)] border border-[var(--border)] rounded-xl">
+              <span className="text-lg font-bold text-[var(--text-sec)]">Total a Cobrar</span>
+              <span className="text-3xl font-black text-[var(--text-main)]">${total.toFixed(2)}</span>
+            </div>
+
+            <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+              {payments.map((payment, index) => (
+                <div key={index} className="flex flex-col gap-2 p-3 bg-[var(--bg)] border border-[var(--border)] rounded-xl">
+                  <div className="flex justify-between items-center">
+                    <Select
+                      value={payment.paymentMethod}
+                      onValueChange={(val: any) => {
+                        const newPayments = [...payments];
+                        newPayments[index].paymentMethod = val;
+                        setPayments(newPayments);
+                      }}
+                    >
+                      <SelectTrigger className="w-[160px] h-9 text-xs font-bold bg-[var(--card)]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["EFECTIVO", "TARJETA", "TRANSFERENCIA", "CREDITO"]
+                          .filter(method => {
+                            if (method === "CREDITO" && sysConfig?.allowCreditSales === false) return false;
+                            if (!branchPaymentConfig) return true;
+                            if (method === "EFECTIVO" && !branchPaymentConfig.acceptsCash) return false;
+                            if (method === "TARJETA" && !branchPaymentConfig.acceptsCard) return false;
+                            if (method === "TRANSFERENCIA" && !branchPaymentConfig.acceptsTransfer) return false;
+                            if (method === "CREDITO" && !branchPaymentConfig.acceptsCredit) return false;
+                            return true;
+                          })
+                          .map(m => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))
+                        }
+                      </SelectContent>
+                    </Select>
+
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-black text-[var(--primary)]">$</span>
+                        <NumberInput
+                          value={payment.amount}
+                          onValueChange={(val) => {
+                            const newPayments = [...payments];
+                            newPayments[index].amount = val || 0;
+                            setPayments(newPayments);
+                          }}
+                          min={0}
+                          step={0.01}
+                          hideControls={true}
+                          className="w-28 h-9 pl-5 pr-3 text-right font-black text-[var(--primary)] text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-0"
+                        />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-rose-500 hover:bg-rose-100 shrink-0"
+                        onClick={() => {
+                          if (payments.length > 1) {
+                            setPayments(payments.filter((_, i) => i !== index));
+                          }
+                        }}
+                        disabled={payments.length === 1}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                  {(payment.paymentMethod === 'TARJETA' || payment.paymentMethod === 'TRANSFERENCIA') && (
+                    <Input
+                      placeholder="N° Referencia / Voucher (Opcional)"
+                      value={payment.reference || ''}
+                      onChange={(e) => {
+                        const newPayments = [...payments];
+                        newPayments[index].reference = e.target.value;
+                        setPayments(newPayments);
+                      }}
+                      className="h-8 text-xs bg-[var(--card)]"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full h-10 border-dashed border-[var(--primary)]/50 text-[var(--primary)] hover:bg-[var(--primary)]/10"
+              onClick={() => {
+                const currentSum = payments.reduce((sum, p) => sum + p.amount, 0);
+                const diff = total - currentSum;
+                setPayments([...payments, { paymentMethod: 'EFECTIVO', amount: diff > 0 ? diff : 0 }]);
+              }}
+            >
+              <Plus size={16} className="mr-2" /> Agregar otro método de pago
+            </Button>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-3 pt-4 border-t border-[var(--border)]">
+            <div className="flex-1 flex justify-between items-center w-full">
+              <span className="text-sm font-bold text-[var(--text-sec)]">Resta:</span>
+              <span className={cn("text-lg font-black", (total - payments.reduce((sum, p) => sum + p.amount, 0)) === 0 ? "text-emerald-500" : "text-rose-500")}>
+                ${(total - payments.reduce((sum, p) => sum + p.amount, 0)).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="ghost" onClick={() => setShowMixedPaymentModal(false)} className="flex-1 sm:flex-none">
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!isCheckoutSubmittingGlobal) processSale();
+                }}
+                disabled={loading || Math.abs(payments.reduce((sum, p) => sum + p.amount, 0) - total) > 0.01}
+                className="flex-1 sm:flex-none bg-[var(--primary)] text-white"
+              >
+                {loading ? <RefreshCcw className="animate-spin size-4 mr-2" /> : "Confirmar Venta"}
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
