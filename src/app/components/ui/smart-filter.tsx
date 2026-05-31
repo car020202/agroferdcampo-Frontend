@@ -168,25 +168,26 @@ export function SmartFilter({ config, className }: SmartFilterProps) {
                         )}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[200px] p-0" align="start">
+                    <PopoverContent className="p-0" style={{ width: 'max-content', minWidth: '120px', maxWidth: '350px' }} align="start">
                       <div className="p-2 space-y-1">
                         <Button
                           variant="ghost"
-                          className="w-full justify-start font-normal h-8 px-2"
+                          className="w-full justify-between font-normal h-8 px-2 gap-4"
                           onClick={() => setFilter(c.id, null)}
                         >
-                          Todos
-                          {!currentVal && <Check className="ml-auto h-4 w-4" />}
+                          <span className="truncate text-left">Todos</span>
+                          {!currentVal ? <Check className="h-4 w-4 shrink-0" /> : <div className="w-4 h-4 shrink-0" />}
                         </Button>
                         {c.options?.map(opt => (
                           <Button
                             key={opt.value}
                             variant="ghost"
-                            className="w-full justify-start font-normal h-8 px-2"
+                            className="w-full justify-between font-normal h-8 px-2 gap-4"
                             onClick={() => setFilter(c.id, opt.value)}
+                            title={opt.label}
                           >
-                            {opt.label}
-                            {currentVal === opt.value && <Check className="ml-auto h-4 w-4" />}
+                            <span className="truncate text-left">{opt.label}</span>
+                            {currentVal === opt.value ? <Check className="h-4 w-4 shrink-0" /> : <div className="w-4 h-4 shrink-0" />}
                           </Button>
                         ))}
                       </div>

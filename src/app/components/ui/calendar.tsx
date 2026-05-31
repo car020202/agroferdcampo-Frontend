@@ -28,7 +28,7 @@ function Calendar({
         months: "flex flex-col sm:flex-row gap-2",
         month: "flex flex-col gap-4",
         caption: "flex justify-center pt-2 relative items-center w-full mb-2 h-10",
-        caption_label: "hidden", 
+        caption_label: "text-sm font-medium capitalize", 
         caption_dropdowns: "flex justify-center items-center gap-2 font-semibold z-20",
         dropdown: "flex items-center",
         dropdown_month: "relative inline-flex items-center",
