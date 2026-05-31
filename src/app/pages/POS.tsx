@@ -658,7 +658,7 @@ export function POS() {
       }
       setCart([]);
       setSearchTerm("");
-      setProducts([]);
+      searchProducts("");
       setSelectedCustomer(null);
       setCheckoutDueDate("");
       setTransportData(null);
