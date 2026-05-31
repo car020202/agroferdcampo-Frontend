@@ -36,6 +36,8 @@ export interface DeliverDeliveryNoteDto {
   notes?: string;
   items: DeliverDeliveryNoteItemDto[];
   clientSignedBy?: string;
+  clientSignature?: string;
+  proofPhoto?: string;
 }
 
 export interface DeliveryNoteResponse {
