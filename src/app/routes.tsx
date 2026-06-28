@@ -30,6 +30,7 @@ import { Credit } from "./pages/Credit";
 import Vehicles from "./pages/Vehicles";
 import DeliveryRoutes from "./pages/DeliveryRoutes";
 import { Audit } from "./pages/Audit";
+import { Caja } from "./pages/Caja";
 
 // Roles definidos como strings — coinciden exactamente con el enum BranchRole del backend
 const ROLES = {
@@ -39,9 +40,10 @@ const ROLES = {
   CAJERO: "CAJERO",
   BODEGUERO: "BODEGUERO",
   CONDUCTOR: "CONDUCTOR",
+  VENDEDOR: "VENDEDOR",
 } as const;
 
-const { PROPIETARIO, ADMINISTRADOR, SUPERVISOR, CAJERO, BODEGUERO } = ROLES;
+const { PROPIETARIO, ADMINISTRADOR, SUPERVISOR, CAJERO, BODEGUERO, VENDEDOR } = ROLES;
 
 export const router = createBrowserRouter([
   {
@@ -75,15 +77,22 @@ export const router = createBrowserRouter([
         path: "ui-showcase",
         element: <UIComponentsShowcase />,
       },
-      // Propietario, Admin, Supervisor, Cajero
+      // POS + Cotizaciones: Admins + CAJERO + VENDEDOR
       {
-        element: <ProtectedRoute allowedRoles={[PROPIETARIO, ADMINISTRADOR, SUPERVISOR, CAJERO]} />,
+        element: <ProtectedRoute allowedRoles={[PROPIETARIO, ADMINISTRADOR, SUPERVISOR, CAJERO, VENDEDOR]} />,
         children: [
           { path: "pos", element: <POS /> },
-          { path: "sales", element: <SalesHistory /> },
           { path: "quotes", element: <Quotes /> },
           { path: "quotes/new", element: <NewQuote /> },
           { path: "customers", element: <Customers /> },
+        ],
+      },
+      // Caja + Ventas + Finanzas + Crédito: Admins + CAJERO
+      {
+        element: <ProtectedRoute allowedRoles={[PROPIETARIO, ADMINISTRADOR, SUPERVISOR, CAJERO]} />,
+        children: [
+          { path: "caja", element: <Caja /> },
+          { path: "sales", element: <SalesHistory /> },
           { path: "credit", element: <Credit /> },
           { path: "finance", element: <Finance /> },
         ],

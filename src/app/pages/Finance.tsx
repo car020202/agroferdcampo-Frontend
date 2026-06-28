@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { 
   Wallet, DollarSign, TrendingUp, Search, 
   ArrowDownCircle, ArrowUpCircle, Filter, CheckCircle2, XCircle, Clock, FileDown, FileSpreadsheet, FileText, Printer
@@ -271,7 +271,7 @@ export function Finance() {
           Object.entries(bills).forEach(([denom, count]) => {
             const denomValue = Number(denom.replace('d', ''));
             if (Number(count) > 0) {
-              breakdownHtml += `<div class="flex-between"><span>Billetes $${denomValue} x${count}</span><span>$${(denomValue * Number(count)).toFixed(2)}</span></div>`;
+              breakdownHtml += `<div class="flex-between"><span>Billetes $${denomValue} x${count}</span><span>$${(denomValue * Number(count)).toFixed(4)}</span></div>`;
             }
           });
         }
@@ -279,7 +279,7 @@ export function Finance() {
           Object.entries(coins).forEach(([denom, count]) => {
             const denomValue = Number(denom.replace('c', '')) / 100;
             if (Number(count) > 0) {
-              breakdownHtml += `<div class="flex-between"><span>Monedas $${denomValue.toFixed(2)} x${count}</span><span>$${(denomValue * Number(count)).toFixed(2)}</span></div>`;
+              breakdownHtml += `<div class="flex-between"><span>Monedas $${denomValue.toFixed(4)} x${count}</span><span>$${(denomValue * Number(count)).toFixed(4)}</span></div>`;
             }
           });
         }
@@ -309,11 +309,11 @@ export function Finance() {
           <div>Caja: ${shift.cashRegister?.name || 'General'}</div>
           <div>Fecha: ${date}</div>
           <div class="divider">--------------------------------</div>
-          <div class="flex-between"><span>Fondo Base:</span><span>$${Number(shift.initialAmount).toFixed(2)}</span></div>
-          <div class="flex-between"><span>Total Ventas:</span><span>$${totalVentas.toFixed(2)}</span></div>
-          <div class="flex-between"><span>Monto Esperado:</span><span>$${Number(shift.expectedAmount).toFixed(2)}</span></div>
-          <div class="flex-between"><span>Monto Contado:</span><span>$${Number(shift.countedAmount).toFixed(2)}</span></div>
-          <div class="flex-between bold"><span>Diferencia:</span><span>$${Number(shift.difference).toFixed(2)}</span></div>
+          <div class="flex-between"><span>Fondo Base:</span><span>$${Number(shift.initialAmount).toFixed(4)}</span></div>
+          <div class="flex-between"><span>Total Ventas:</span><span>$${totalVentas.toFixed(4)}</span></div>
+          <div class="flex-between"><span>Monto Esperado:</span><span>$${Number(shift.expectedAmount).toFixed(4)}</span></div>
+          <div class="flex-between"><span>Monto Contado:</span><span>$${Number(shift.countedAmount).toFixed(4)}</span></div>
+          <div class="flex-between bold"><span>Diferencia:</span><span>$${Number(shift.difference).toFixed(4)}</span></div>
           ${breakdownHtml}
           <div class="divider">================================</div>
           <div class="text-center" style="margin-top: 30px;">
@@ -490,7 +490,7 @@ export function Finance() {
                 <h3 className="text-sm font-bold text-[var(--text-sec)]">Saldo Caja General</h3>
               </div>
               <p className={`text-3xl font-black ${generalSummary && generalSummary.balance >= 0 ? 'text-[var(--primary)]' : 'text-red-500'}`}>
-                ${generalSummary?.balance?.toFixed(2) || '0.00'}
+                ${generalSummary?.balance?.toFixed(4) || '0.00'}
               </p>
             </Card>
             <Card className="p-6 bg-[var(--card)] border-[var(--border)] shadow-sm">
@@ -501,7 +501,7 @@ export function Finance() {
                 <h3 className="text-sm font-bold text-[var(--text-sec)]">Total Ingresos</h3>
               </div>
               <p className="text-3xl font-black text-emerald-600">
-                ${generalSummary?.totalIngresos?.toFixed(2) || '0.00'}
+                ${generalSummary?.totalIngresos?.toFixed(4) || '0.00'}
               </p>
             </Card>
             <Card className="p-6 bg-[var(--card)] border-[var(--border)] shadow-sm">
@@ -512,7 +512,7 @@ export function Finance() {
                 <h3 className="text-sm font-bold text-[var(--text-sec)]">Total Egresos</h3>
               </div>
               <p className="text-3xl font-black text-rose-600">
-                ${generalSummary?.totalEgresos?.toFixed(2) || '0.00'}
+                ${generalSummary?.totalEgresos?.toFixed(4) || '0.00'}
               </p>
             </Card>
           </div>
@@ -564,7 +564,7 @@ export function Finance() {
                         {m.reference && <p className="text-xs text-[var(--text-sec)]">Ref: {m.reference}</p>}
                       </TableCell>
                       <TableCell className={`text-right font-bold ${m.type === 'INGRESO' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {m.type === 'INGRESO' ? '+' : '-'}${Number(m.amount).toFixed(2)}
+                        {m.type === 'INGRESO' ? '+' : '-'}${Number(m.amount).toFixed(4)}
                       </TableCell>
                     </TableRow>
                   ))
@@ -597,13 +597,13 @@ export function Finance() {
                 <Card className="p-6 bg-[var(--card)] border-[var(--border)] shadow-sm">
                   <h3 className="text-sm font-bold text-[var(--text-sec)] mb-2">Saldo Actual</h3>
                   <p className={`text-3xl font-black ${isPettyLow ? 'text-amber-500' : 'text-[var(--primary)]'}`}>
-                    ${Number(pettyStatus.currentBalance).toFixed(2)}
+                    ${Number(pettyStatus.currentBalance).toFixed(4)}
                   </p>
                   {isPettyLow && <p className="text-xs text-amber-500 font-bold mt-1">Saldo bajo mínimo</p>}
                 </Card>
                 <Card className="p-6 bg-[var(--card)] border-[var(--border)] shadow-sm">
                   <h3 className="text-sm font-bold text-[var(--text-sec)] mb-2">Límite Máximo</h3>
-                  <p className="text-3xl font-black text-[var(--text-main)]">${Number(pettyStatus.maxBalance).toFixed(2)}</p>
+                  <p className="text-3xl font-black text-[var(--text-main)]">${Number(pettyStatus.maxBalance).toFixed(4)}</p>
                 </Card>
               </div>
 
@@ -644,7 +644,7 @@ export function Finance() {
                               </span>
                             </TableCell>
                             <TableCell className={`text-right font-bold ${m.type === 'INGRESO' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {m.type === 'INGRESO' ? '+' : '-'}${Number(m.amount).toFixed(2)}
+                              {m.type === 'INGRESO' ? '+' : '-'}${Number(m.amount).toFixed(4)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -664,7 +664,7 @@ export function Finance() {
                         <div key={r.id} className="p-3 border rounded-xl bg-[var(--bg)]">
                           <div className="flex justify-between items-start mb-2">
                             <div>
-                              <p className="font-bold">Monto solicitado: ${Number(r.amount).toFixed(2)}</p>
+                              <p className="font-bold">Monto solicitado: ${Number(r.amount).toFixed(4)}</p>
                               <p className="text-xs text-[var(--text-sec)]">{r.reason}</p>
                             </div>
                             <Badge variant={r.status === 'PENDIENTE' ? 'secondary' : r.status === 'APROBADA' ? 'success' : 'destructive'}>
@@ -733,10 +733,10 @@ export function Finance() {
                             <div className="text-amber-500 font-bold">En curso</div>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">${Number(s.initialAmount).toFixed(2)}</TableCell>
-                        <TableCell className="text-right">{s.expectedAmount !== null ? `$${Number(s.expectedAmount).toFixed(2)}` : '-'}</TableCell>
+                        <TableCell className="text-right">${Number(s.initialAmount).toFixed(4)}</TableCell>
+                        <TableCell className="text-right">{s.expectedAmount !== null ? `$${Number(s.expectedAmount).toFixed(4)}` : '-'}</TableCell>
                         <TableCell className={`text-right font-bold ${Number(s.difference) < 0 ? 'text-rose-500' : Number(s.difference) > 0 ? 'text-emerald-500' : 'text-[var(--text-sec)]'}`}>
-                          {s.difference !== null ? `$${Number(s.difference).toFixed(2)}` : '-'}
+                          {s.difference !== null ? `$${Number(s.difference).toFixed(4)}` : '-'}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant={s.status === 'ABIERTO' ? 'default' : 'secondary'}>
@@ -882,7 +882,7 @@ export function Finance() {
                       <SelectItem value="none">Sin vincular por ahora</SelectItem>
                       {supplierPurchases.map((p: any) => (
                         <SelectItem key={p.id} value={p.id.toString()}>
-                          OC-{p.id.toString().padStart(6, '0')} — {p.supplier?.name} — ${Number(p.totalAmount).toFixed(2)}
+                          OC-{p.id.toString().padStart(6, '0')} — {p.supplier?.name} — ${Number(p.totalAmount).toFixed(4)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -997,15 +997,15 @@ export function Finance() {
                     <h4 className="font-bold text-sm text-[var(--text-main)] mb-2 border-b border-[var(--border)] pb-2">Valores del Sistema</h4>
                     <div className="flex justify-between text-sm">
                       <span className="text-[var(--text-sec)]">Efectivo Esperado:</span>
-                      <span className="font-bold">${Number(adminCloseTotals.expectedAmount).toFixed(2)}</span>
+                      <span className="font-bold">${Number(adminCloseTotals.expectedAmount).toFixed(4)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-[var(--text-sec)]">Tarjeta Esperada:</span>
-                      <span className="font-bold">${Number(adminCloseTotals.expectedTarjeta).toFixed(2)}</span>
+                      <span className="font-bold">${Number(adminCloseTotals.expectedTarjeta).toFixed(4)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-[var(--text-sec)]">Transferencia Esperada:</span>
-                      <span className="font-bold">${Number(adminCloseTotals.expectedTransferencia).toFixed(2)}</span>
+                      <span className="font-bold">${Number(adminCloseTotals.expectedTransferencia).toFixed(4)}</span>
                     </div>
                   </div>
                 )}
@@ -1037,7 +1037,7 @@ export function Finance() {
                   <div className="p-4 bg-[var(--bg)] border rounded-xl h-full flex flex-col">
                     <h4 className="font-bold text-sm text-[var(--text-main)] mb-2 border-b border-[var(--border)] pb-2">Desglose Reportado por el Cajero</h4>
                     <p className="text-xs text-[var(--text-sec)] mb-4">
-                      Total reportado: <span className="font-bold text-emerald-600 text-sm">${Number(adminCloseTotals.countedAmount).toFixed(2)}</span>
+                      Total reportado: <span className="font-bold text-emerald-600 text-sm">${Number(adminCloseTotals.countedAmount).toFixed(4)}</span>
                     </p>
                     
                     <div className="grid grid-cols-2 gap-4 text-xs flex-1">

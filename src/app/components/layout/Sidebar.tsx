@@ -21,18 +21,21 @@ import {
   Landmark,
   Route,
   History,
-  ShieldAlert
+  ShieldAlert,
+  Banknote,
 } from "lucide-react";
 
+// roleId: 1=PROPIETARIO, 2=ADMINISTRADOR, 3=SUPERVISOR, 4=CAJERO, 5=BODEGUERO, 6=VENDEDOR
 const navLinks = [
   { path: "/home", icon: Sprout, label: "Inicio" },
-  { path: "/pos", icon: ShoppingCart, label: "Punto de Venta", roles: [1, 2, 3, 4] },
+  { path: "/pos", icon: ShoppingCart, label: "Punto de Venta", roles: [1, 2, 3, 4, 6] },
+  { path: "/caja", icon: Banknote, label: "Caja (Cobros)", roles: [1, 2, 3, 4] },
   { path: "/sales", icon: History, label: "Historial de Ventas", roles: [1, 2, 3, 4] },
-  { path: "/quotes", icon: FileText, label: "Cotizaciones", roles: [1, 2, 3, 4] },
+  { path: "/quotes", icon: FileText, label: "Cotizaciones", roles: [1, 2, 3, 4, 6] },
   { path: "/inventory", icon: Package, label: "Inventario", roles: [1, 2, 3, 5] },
   { path: "/purchases", icon: ShoppingBag, label: "Compras a Prov.", roles: [1, 2, 5] },
   { path: "/delivery-notes", icon: TruckIcon, label: "Albaranes", roles: [1, 2, 3, 5] },
-  { path: "/customers", icon: Users, label: "Clientes", roles: [1, 2, 3, 4] },
+  { path: "/customers", icon: Users, label: "Clientes", roles: [1, 2, 3, 4, 6] },
   { path: "/credit", icon: Landmark, label: "Cuentas por Cobrar", roles: [1, 2, 3, 4] },
   { path: "/finance", icon: Wallet, label: "Finanzas y Caja", roles: [1, 2, 3, 4] },
   { path: "/rrhh", icon: Briefcase, label: "Recursos Humanos", roles: [1, 2, 3] },

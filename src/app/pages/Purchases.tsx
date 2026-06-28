@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, FileText, CheckCircle2, AlertCircle, Eye, Plus, 
   Trash2, RefreshCcw, Filter, Calendar as CalendarIcon, Store, Package, Download, X,
@@ -817,7 +817,7 @@ export function Purchases() {
                       {purchase.referenceDoc && <span className="text-[10px] text-muted-foreground">Ref: {purchase.referenceDoc}</span>}
                     </TableCell>
                     <TableCell className="text-right font-black text-[var(--text-main)]">
-                      ${Number(purchase.totalAmount).toFixed(2)}
+                      ${Number(purchase.totalAmount).toFixed(4)}
                     </TableCell>
                     <TableCell className="text-center">
                       {getStatusBadge(purchase.status)}
@@ -1051,7 +1051,7 @@ export function Purchases() {
                           />
                         </TableCell>
                         <TableCell className="text-right font-black text-[var(--primary)]">
-                          ${(Number(item.quantity) * Number(item.unitCost)).toFixed(2)}
+                          ${(Number(item.quantity) * Number(item.unitCost)).toFixed(4)}
                         </TableCell>
                         <TableCell>
                           <Button 
@@ -1072,7 +1072,7 @@ export function Purchases() {
                 <div className="p-4 bg-muted/30 border-t flex justify-end">
                   <p className="text-xl font-black">
                     Total: <span className="text-[var(--primary)]">
-                      ${newPurchase.items.reduce((sum: number, i: any) => sum + (Number(i.quantity) * Number(i.unitCost)), 0).toFixed(2)}
+                      ${newPurchase.items.reduce((sum: number, i: any) => sum + (Number(i.quantity) * Number(i.unitCost)), 0).toFixed(4)}
                     </span>
                   </p>
                 </div>
@@ -1125,14 +1125,14 @@ export function Purchases() {
                         <TableCell className="font-bold">{item.product?.name}</TableCell>
                         <TableCell className="text-center">{item.quantity}</TableCell>
                         <TableCell className="text-center text-emerald-600 font-bold">{item.receivedQuantity}</TableCell>
-                        <TableCell className="text-right">${Number(item.unitCost).toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-black">${Number(item.totalCost).toFixed(2)}</TableCell>
+                        <TableCell className="text-right">${Number(item.unitCost).toFixed(4)}</TableCell>
+                        <TableCell className="text-right font-black">${Number(item.totalCost).toFixed(4)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
                 <div className="flex justify-end p-4 border-t">
-                  <p className="text-xl font-black">Total: <span className="text-[var(--primary)]">${Number(selectedPurchase.totalAmount).toFixed(2)}</span></p>
+                  <p className="text-xl font-black">Total: <span className="text-[var(--primary)]">${Number(selectedPurchase.totalAmount).toFixed(4)}</span></p>
                 </div>
               </div>
             </>
@@ -1207,7 +1207,7 @@ export function Purchases() {
                       <SelectItem value="none">No vincular</SelectItem>
                       {unlinkedPayments.map(p => (
                         <SelectItem key={p.id} value={p.id.toString()}>
-                          ${Number(p.amount).toFixed(2)} — {p.description} ({new Date(p.date).toLocaleDateString()})
+                          ${Number(p.amount).toFixed(4)} — {p.description} ({new Date(p.date).toLocaleDateString()})
                         </SelectItem>
                       ))}
                     </SelectContent>

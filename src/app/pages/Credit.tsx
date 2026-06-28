@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, FileText, Filter, CheckCircle2,
   CreditCard, DollarSign, AlertCircle, Plus, Eye, History, Users as UsersIcon, RefreshCcw, Trash2, Printer,
@@ -178,7 +178,7 @@ export function Credit() {
     const amount = Number(paymentForm.amount);
     const maxAmount = Number(selectedCreditForPayment.remainingAmount) || 0;
     if (amount <= 0 || amount > maxAmount) {
-      toast.error(`El monto debe ser mayor a 0 y no puede exceder $${maxAmount.toFixed(2)}`);
+      toast.error(`El monto debe ser mayor a 0 y no puede exceder $${maxAmount.toFixed(4)}`);
       return;
     }
     
@@ -303,7 +303,7 @@ export function Credit() {
         </div>
         <div class="row">
           <span>${payment.paymentMethod}</span>
-          <span>$${Number(payment.amount).toFixed(2)}</span>
+          <span>$${Number(payment.amount).toFixed(4)}</span>
         </div>
         ${payment.reference ? `<div class="row"><span>Referencia:</span><span>${payment.reference}</span></div>` : ''}
         
@@ -311,7 +311,7 @@ export function Credit() {
         
         <div class="row bold" style="font-size: 14px; margin-top: 10px;">
           <span>TOTAL ABONADO:</span>
-          <span>$${Number(payment.amount).toFixed(2)}</span>
+          <span>$${Number(payment.amount).toFixed(4)}</span>
         </div>
         
         <div class="divider"></div>
@@ -385,9 +385,9 @@ export function Credit() {
       {/* Stats Cards */}
       <SemaphoreBanner
         metrics={[
-          { label: 'Cartera Total', value: summary ? `$${Number(summary.totalCxC).toFixed(2)}` : '$0.00', status: 'info' },
-          { label: 'Saldo Vencido', value: summary ? `$${Number(summary.totalVencido).toFixed(2)}` : '$0.00', status: 'danger' },
-          { label: 'Por Vencer (7d)', value: summary ? `$${Number(summary.totalPorVencer).toFixed(2)}` : '$0.00', status: 'warning' },
+          { label: 'Cartera Total', value: summary ? `$${Number(summary.totalCxC).toFixed(4)}` : '$0.00', status: 'info' },
+          { label: 'Saldo Vencido', value: summary ? `$${Number(summary.totalVencido).toFixed(4)}` : '$0.00', status: 'danger' },
+          { label: 'Por Vencer (7d)', value: summary ? `$${Number(summary.totalPorVencer).toFixed(4)}` : '$0.00', status: 'warning' },
           { label: 'Clientes Activos', value: summary ? summary.totalClientes : 0, status: 'success' },
         ]}
       />
@@ -444,13 +444,13 @@ export function Credit() {
                       )}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      ${Number(group.totalDebt).toFixed(2)}
+                      ${Number(group.totalDebt).toFixed(4)}
                     </TableCell>
                     <TableCell className="text-right font-medium text-emerald-600">
-                      ${Number(group.totalPaid).toFixed(2)}
+                      ${Number(group.totalPaid).toFixed(4)}
                     </TableCell>
                     <TableCell className="text-right font-black text-[var(--primary)]">
-                      ${Number(group.totalRemaining).toFixed(2)}
+                      ${Number(group.totalRemaining).toFixed(4)}
                     </TableCell>
                     <TableCell className="text-center">
                       {getStatusBadge(group.status)}
@@ -512,15 +512,15 @@ export function Credit() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-[var(--bg)] p-4 rounded-xl border">
                     <p className="text-xs font-bold text-[var(--text-sec)] uppercase">Total Deuda</p>
-                    <p className="text-lg font-bold">${Number(selectedGroup.totalDebt).toFixed(2)}</p>
+                    <p className="text-lg font-bold">${Number(selectedGroup.totalDebt).toFixed(4)}</p>
                   </div>
                   <div className="bg-emerald-500/10 dark:bg-emerald-500/20 p-4 rounded-xl border border-emerald-500/20 dark:border-emerald-500/30">
                     <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase">Abonado</p>
-                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">${Number(selectedGroup.totalPaid).toFixed(2)}</p>
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">${Number(selectedGroup.totalPaid).toFixed(4)}</p>
                   </div>
                   <div className="bg-[var(--primary)]/10 p-4 rounded-xl border border-[var(--primary)]/20">
                     <p className="text-xs font-bold text-[var(--primary)] uppercase">Saldo Pendiente</p>
-                    <p className="text-lg font-black text-[var(--primary)]">${Number(selectedGroup.totalRemaining).toFixed(2)}</p>
+                    <p className="text-lg font-black text-[var(--primary)]">${Number(selectedGroup.totalRemaining).toFixed(4)}</p>
                   </div>
                 </div>
 
@@ -608,9 +608,9 @@ export function Credit() {
                                 <TableCell className={isOverdue ? 'text-rose-500 font-bold' : ''}>
                                   {dateToUse.toLocaleDateString()}
                                 </TableCell>
-                                <TableCell className="text-right">${Number(s.originalAmount).toFixed(2)}</TableCell>
-                                <TableCell className="text-right text-emerald-600">${Number(s.paidAmount).toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-bold text-[var(--primary)]">${Number(s.remainingAmount).toFixed(2)}</TableCell>
+                                <TableCell className="text-right">${Number(s.originalAmount).toFixed(4)}</TableCell>
+                                <TableCell className="text-right text-emerald-600">${Number(s.paidAmount).toFixed(4)}</TableCell>
+                                <TableCell className="text-right font-bold text-[var(--primary)]">${Number(s.remainingAmount).toFixed(4)}</TableCell>
                                 <TableCell className="text-center">{getStatusBadge(s.status)}</TableCell>
                                 <TableCell className="text-center">
                                   <div className="flex justify-center gap-1">
@@ -644,7 +644,7 @@ export function Credit() {
           <DialogHeader>
             <DialogTitle>Registrar Abono</DialogTitle>
             <DialogDescription>
-              {selectedGroup?.customer?.name ?? `Cliente #${selectedCreditForPayment?.customerId}`} — Venta #{selectedCreditForPayment?.saleId} — Saldo: ${remaining.toFixed(2)}
+              {selectedGroup?.customer?.name ?? `Cliente #${selectedCreditForPayment?.customerId}`} — Venta #{selectedCreditForPayment?.saleId} — Saldo: ${remaining.toFixed(4)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -775,7 +775,7 @@ export function Credit() {
                               <TableCell>{p.reference || '-'}</TableCell>
                               <TableCell>{p.user?.fullName || '-'}</TableCell>
                               <TableCell className="text-right font-bold text-emerald-600">
-                                ${Number(p.amount).toFixed(2)}
+                                ${Number(p.amount).toFixed(4)}
                               </TableCell>
                               <TableCell className="text-center">
                                 <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDetail(p)} className="text-[var(--primary)] hover:bg-[var(--primary)]/10" title="Ver Detalle de Abono">
@@ -917,8 +917,8 @@ export function Credit() {
                                 <p className="font-bold text-[var(--text-main)] uppercase">{item.product?.name}</p>
                                 <p className="text-[10px] text-[var(--text-sec)] uppercase">Cód: {item.product?.id}</p>
                               </TableCell>
-                              <TableCell className="text-right text-[var(--text-sec)] font-medium">${Number(item.unitPrice).toFixed(2)}</TableCell>
-                              <TableCell className="text-right font-black text-amber-500">${Number(item.totalPrice).toFixed(2)}</TableCell>
+                              <TableCell className="text-right text-[var(--text-sec)] font-medium">${Number(item.unitPrice).toFixed(4)}</TableCell>
+                              <TableCell className="text-right font-black text-amber-500">${Number(item.totalPrice).toFixed(4)}</TableCell>
                             </TableRow>
                           ))}
                           {!specificSaleDetail?.items?.length && (
@@ -933,7 +933,7 @@ export function Credit() {
                       <div className="p-4 border-t border-[var(--border)] flex justify-end bg-[var(--bg)]/50">
                         <div className="flex items-center gap-8">
                           <p className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-widest">Total a Pagar</p>
-                          <p className="text-xl font-black text-amber-500">${Number(specificSaleDetail?.totalAmount || 0).toFixed(2)}</p>
+                          <p className="text-xl font-black text-amber-500">${Number(specificSaleDetail?.totalAmount || 0).toFixed(4)}</p>
                         </div>
                       </div>
                     </div>
@@ -1029,7 +1029,7 @@ export function Credit() {
                         </div>
                         <div className="border-t border-[var(--border)] pt-4 flex justify-between items-center">
                           <p className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-widest">Total Abonado</p>
-                          <p className="text-xl font-black text-emerald-600">${Number(selectedPaymentDetail.amount).toFixed(2)}</p>
+                          <p className="text-xl font-black text-emerald-600">${Number(selectedPaymentDetail.amount).toFixed(4)}</p>
                         </div>
                       </div>
                     </div>

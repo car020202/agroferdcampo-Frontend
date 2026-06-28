@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import {
   Package,
   Search,
@@ -696,7 +696,7 @@ function InventoryList() {
                     <TableCell className="text-right">
                       <div className="flex flex-col items-end">
                         <span className="font-black text-[var(--text-main)]">
-                          ${getPublicPrice(item.product).toFixed(2)}
+                          ${getPublicPrice(item.product).toFixed(4)}
                         </span>
                         <span className="text-[9px] font-bold opacity-40 text-[var(--text-sec)]">
                           / {item.product.unit}

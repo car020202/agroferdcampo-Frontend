@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, User, CheckCircle2,
@@ -359,10 +359,10 @@ export function NewQuote() {
                     <div className="mt-auto flex items-center justify-between pt-2 border-t border-[var(--border)] border-dashed">
                       <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center">
                         <Percent size={10} className="mr-0.5"/> 
-                        ${Number(product.costPrice || 0).toFixed(2)}
+                        ${Number(product.costPrice || 0).toFixed(4)}
                       </span>
                       <span className="text-sm font-black text-[var(--primary)]">
-                        ${Number(product.price).toFixed(2)}
+                        ${Number(product.price).toFixed(4)}
                       </span>
                     </div>
                   </div>
@@ -491,8 +491,8 @@ export function NewQuote() {
                         <Button variant="ghost" size="icon" className="w-7 h-7 rounded-none hover:bg-[var(--primary)]/10 hover:text-[var(--primary)]" onClick={() => updateCartQuantity(item.id, item.quantity + 1)}><Plus size={12} /></Button>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-[var(--text-sec)] font-mono">${item.unitPrice.toFixed(2)}</p>
-                        <p className="text-sm font-black text-[var(--primary)]">${item.subtotal.toFixed(2)}</p>
+                        <p className="text-xs text-[var(--text-sec)] font-mono">${item.unitPrice.toFixed(4)}</p>
+                        <p className="text-sm font-black text-[var(--primary)]">${item.subtotal.toFixed(4)}</p>
                       </div>
                     </div>
                     {item.marginPercent < 5 && item.marginPercent >= 0 && (
@@ -514,15 +514,15 @@ export function NewQuote() {
         <div className="bg-[var(--card)] border-t border-[var(--border)] p-4 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] relative z-10 space-y-3">
           <div className="flex justify-between text-xs font-bold text-[var(--text-sec)]">
             <span>Costo Total</span>
-            <span>${cartCost.toFixed(2)}</span>
+            <span>${cartCost.toFixed(4)}</span>
           </div>
           <div className="flex justify-between text-xs font-bold text-emerald-600">
             <span>Ganancia Est.</span>
-            <span>${estimatedProfit.toFixed(2)}</span>
+            <span>${estimatedProfit.toFixed(4)}</span>
           </div>
           <div className="flex justify-between text-xl font-black text-[var(--primary)] border-t border-[var(--border)] pt-2">
             <span>TOTAL</span>
-            <span>${cartTotal.toFixed(2)}</span>
+            <span>${cartTotal.toFixed(4)}</span>
           </div>
           <Button 
             className="w-full h-14 text-lg font-black bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white shadow-lg shadow-[var(--primary)]/20 uppercase tracking-wider rounded-xl transition-all active:scale-[0.98]" 
@@ -549,7 +549,7 @@ export function NewQuote() {
               <div className="p-6 space-y-6">
                 <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                   <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Costo Unitario</span>
-                  <span className="text-lg font-black text-emerald-700">${Number(selectedProduct.costPrice || 0).toFixed(2)}</span>
+                  <span className="text-lg font-black text-emerald-700">${Number(selectedProduct.costPrice || 0).toFixed(4)}</span>
                 </div>
 
                 <div className="space-y-3">
@@ -606,7 +606,7 @@ export function NewQuote() {
                   <div className="text-right">
                     <span className="text-xs font-bold text-[var(--text-sec)] uppercase tracking-wider block mb-1">Total Item</span>
                     <span className="text-xl font-black text-[var(--primary)]">
-                      ${(marginForm.quantity * marginForm.unitPrice).toFixed(2)}
+                      ${(marginForm.quantity * marginForm.unitPrice).toFixed(4)}
                     </span>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import {
   Store,
   Search,
@@ -155,8 +155,8 @@ type ProductFormData = z.infer<typeof productSchema>;
 
 function getPublicPrice(prices: ProductPrice[]): string {
   const pub = prices.find((p) => p.priceType === "PUBLICO");
-  if (pub) return Number(pub.price).toFixed(2);
-  if (prices.length > 0) return Number(prices[0].price).toFixed(2);
+  if (pub) return Number(pub.price).toFixed(4);
+  if (prices.length > 0) return Number(prices[0].price).toFixed(4);
   return "0.00";
 }
 
@@ -771,9 +771,9 @@ export function Catalog({ hideTitle }: { hideTitle?: boolean } = {}) {
                       </span>
                       <Input
                         type="number"
-                        step="0.01"
+                        step="0.0001"
                         {...register("costPrice")}
-                        placeholder="0.00"
+                        placeholder="0.0000"
                         className="h-11 pl-7 rounded-xl bg-[var(--card)]"
                       />
                     </div>
@@ -975,21 +975,20 @@ export function Catalog({ hideTitle }: { hideTitle?: boolean } = {}) {
                             </Select>
                           </div>
 
-                          <div className="flex flex-col gap-2 p-2 bg-[var(--surface)] rounded-xl border border-[var(--border)] border-dashed relative">
+                          <div className="flex flex-col gap-2 p-3 bg-[var(--surface)] rounded-xl border border-[var(--border)] border-dashed relative">
                             <Label className="text-[9px] font-bold uppercase opacity-60 absolute -top-2 left-3 bg-[var(--card)] px-1.5">¿Equivalencia?</Label>
-                            <div className="flex items-center justify-center gap-2 w-full mt-1.5">
-                              <span className="text-xs font-bold opacity-80 whitespace-nowrap">
-                                1 {watch(`units.${i}.unit`) || 'Nueva'}
-                              </span>
-                              <span className="text-xs opacity-40 font-bold">=</span>
+                            <p className="text-[10px] font-bold opacity-60 mt-1">
+                              1 {watch(`units.${i}.unit`) || 'Nueva'} =
+                            </p>
+                            <div className="flex items-center gap-2">
                               <Input
                                 type="number"
                                 step="0.01"
                                 {...register(`units.${i}.factor`)}
-                                className="h-8 w-20 text-center font-black text-sm bg-[var(--card)] border-[var(--border)] focus-visible:ring-[var(--primary)]"
-                                placeholder="Ej. 12"
+                                className="h-9 flex-1 min-w-0 text-center font-bold text-sm bg-[var(--card)] border-[var(--border)] focus-visible:ring-1 focus-visible:ring-[var(--border)] focus-visible:ring-offset-0"
+                                placeholder="0"
                               />
-                              <span className="text-xs font-black text-[var(--primary)] whitespace-nowrap">
+                              <span className="text-xs font-bold text-[var(--primary)] whitespace-nowrap shrink-0">
                                 {watch("unit") || 'Base'}
                               </span>
                             </div>

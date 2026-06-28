@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   FileText, AlertCircle, Plus, Eye, History, CreditCard, DollarSign, Upload, X as XIcon
 } from 'lucide-react';
@@ -144,7 +144,7 @@ export function Payables() {
             <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-sec)]">Deuda Mostrada</p>
           </div>
           <p className="text-xl font-black text-[var(--text-main)]">
-            ${calculateTotalDebt().toFixed(2)}
+            ${calculateTotalDebt().toFixed(4)}
           </p>
         </Card>
         
@@ -213,7 +213,7 @@ export function Payables() {
                       })()}
                     </TableCell>
                     <TableCell className="text-right font-black text-[var(--primary)]">
-                      ${Number(purchase.totalAmount).toFixed(2)}
+                      ${Number(purchase.totalAmount).toFixed(4)}
                     </TableCell>
                     <TableCell className="text-center">
                       {getStatusBadge(purchase.status)}
@@ -263,7 +263,7 @@ export function Payables() {
           <DialogHeader>
             <DialogTitle>Registrar Pago a Proveedor</DialogTitle>
             <DialogDescription>
-              {selectedPurchase?.supplier?.name ?? `Proveedor #${selectedPurchase?.supplierId}`} — Total: ${Number(selectedPurchase?.totalAmount || 0).toFixed(2)}
+              {selectedPurchase?.supplier?.name ?? `Proveedor #${selectedPurchase?.supplierId}`} — Total: ${Number(selectedPurchase?.totalAmount || 0).toFixed(4)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

@@ -68,7 +68,21 @@ export interface CashSummaryResponse {
   totalDifference: number;
 }
 
+export interface ProfitPeriodItem {
+  fecha: string;
+  ventas: number;
+  costo: number;
+  utilidad: number;
+  margenPct: number;
+  transacciones: number;
+}
+
 export interface ManagerDashboardResponse {
+  periodo: {
+    startDate: string;
+    endDate: string;
+    label: string;
+  };
   ventas: {
     totalMes: number;
     totalMesAnterior: number;
@@ -76,6 +90,14 @@ export interface ManagerDashboardResponse {
     ticketPromedio: number;
     ticketPromedioAnterior: number;
     transaccionesMes: number;
+  };
+  utilidad: {
+    totalVentas: number;
+    totalCosto: number;
+    utilidad: number;
+    margenPct: number;
+    utilidadAnterior: number;
+    trendPct: number;
   };
   cartera: {
     totalPorCobrar: number;
@@ -105,8 +127,20 @@ export interface ManagerDashboardResponse {
 }
 
 export const reportsService = {
-  getManagerDashboard: async (): Promise<ManagerDashboardResponse> => {
-    return await apiRequest<ManagerDashboardResponse>('/reports/dashboard/manager');
+  getManagerDashboard: async (startDate?: string, endDate?: string): Promise<ManagerDashboardResponse> => {
+    const params = new URLSearchParams();
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    return await apiRequest<ManagerDashboardResponse>(`/reports/dashboard/manager?${params.toString()}`);
+  },
+
+  getProfitByPeriod: async (
+    startDate: string,
+    endDate: string,
+    groupBy: 'day' | 'month' | 'quarter' | 'year' = 'day',
+  ): Promise<ProfitPeriodItem[]> => {
+    const params = new URLSearchParams({ startDate, endDate, groupBy });
+    return await apiRequest<ProfitPeriodItem[]>(`/reports/dashboard/profit?${params.toString()}`);
   },
 
   getDailySales: async (date?: string): Promise<DailySalesResponse> => {

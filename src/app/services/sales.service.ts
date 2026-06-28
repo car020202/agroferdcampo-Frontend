@@ -17,6 +17,7 @@ export interface SalePaymentDto {
   paymentMethod: 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'CREDITO';
   amount: number;
   reference?: string;
+  transferReceiptUrl?: string;
 }
 
 export interface CreateSaleDto {

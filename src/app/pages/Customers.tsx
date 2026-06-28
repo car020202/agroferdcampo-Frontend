@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   Users, Search, Plus, Phone, Mail, CreditCard, 
   AlertCircle, Edit2, Trash2, MoreVertical
@@ -39,13 +39,20 @@ interface Customer {
   customerType: 'CONSUMIDOR_FINAL' | 'CONTRIBUYENTE' | 'SUJETO_EXCLUIDO';
   nit?: string;
   nrc?: string;
+  documentType?: string;
+  documentNumber?: string;
   phone?: string;
   email?: string;
   creditLimit: string | number;
   creditBalance: string | number;
   isActive: boolean;
   comercialName?: string;
-  documentNumber?: string;
+  department?: string;
+  municipality?: string;
+  district?: string;
+  addressComplement?: string;
+  activityCode?: string;
+  activityDescription?: string;
   _count?: {
     sales: number;
     quotes: number;
@@ -115,7 +122,9 @@ export function Customers() {
       // Así que response es el objeto con la data.
       
       if (response && response.data) {
-        setCustomers(response.data);
+        const freshData: Customer[] = response.data;
+        setCustomers(freshData);
+        setSelectedCustomer(prev => prev ? (freshData.find(c => c.id === prev.id) ?? prev) : prev);
         setPagination({
           total: response.total,
           page: response.page,
@@ -250,7 +259,7 @@ export function Customers() {
                     {isAdmin && (
                       <TableCell className="text-right">
                         <span className="font-black text-[var(--text-main)]">
-                          ${Number(customer.creditLimit).toFixed(2)}
+                          ${Number(customer.creditLimit).toFixed(4)}
                         </span>
                       </TableCell>
                     )}
@@ -261,7 +270,7 @@ export function Customers() {
                           Number(customer.creditBalance) > Number(customer.creditLimit) ? "text-destructive" : "text-[var(--primary)]"
                         )}
                       >
-                        ${Number(customer.creditBalance).toFixed(2)}
+                        ${Number(customer.creditBalance).toFixed(4)}
                       </span>
                     </TableCell>
                     <TableCell className="text-center">

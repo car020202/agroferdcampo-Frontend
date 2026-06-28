@@ -204,41 +204,38 @@ export function CustomerDialog({ open, onOpenChange, customer, onSuccess }: Cust
             </div>
           </div>
 
-          {/* Campos Fiscales Condicionales */}
+          {/* Campos Fiscales — solo CONTRIBUYENTE y SUJETO_EXCLUIDO */}
           {(formData.customerType === 'CONTRIBUYENTE' || formData.customerType === 'SUJETO_EXCLUIDO') && (
             <div className="space-y-4 pt-4 border-t border-dashed border-[var(--border)]">
               <h3 className="text-sm font-black flex items-center gap-2 text-[var(--primary)] uppercase tracking-tight">
                 <Building2 size={16} />
                 Información Fiscal Obligatoria
               </h3>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>NIT</Label>
-                  <Input 
-                    required 
-                    value={formData.nit} 
+                  <Input
+                    required
+                    value={formData.nit}
                     onChange={(e) => handleChange('nit', e.target.value)}
                     placeholder="0614-..."
                   />
                 </div>
-
                 {formData.customerType === 'CONTRIBUYENTE' && (
                   <div className="space-y-2">
                     <Label>NRC</Label>
-                    <Input 
-                      required 
-                      value={formData.nrc} 
+                    <Input
+                      required
+                      value={formData.nrc}
                       onChange={(e) => handleChange('nrc', e.target.value)}
                       placeholder="123456-7"
                     />
                   </div>
                 )}
-
                 <div className="space-y-2 md:col-span-2">
                   <Label>Actividad Económica (MH)</Label>
-                  <Select 
-                    value={formData.activityCode} 
+                  <Select
+                    value={formData.activityCode}
                     onValueChange={(v) => {
                       const activity = economicActivities.find(a => a.value === v);
                       handleChange('activityCode', v);
@@ -258,95 +255,10 @@ export function CustomerDialog({ open, onOpenChange, customer, onSuccess }: Cust
                   </Select>
                 </div>
               </div>
-
-              {formData.customerType === 'CONTRIBUYENTE' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Departamento</Label>
-                    <Select 
-                      value={formData.department} 
-                      onValueChange={(v) => {
-                        handleChange('department', v);
-                        handleChange('municipality', '');
-                        handleChange('district', '');
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione departamento" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.filter(d => d.value !== "00").map((dept) => (
-                          <SelectItem key={dept.value} value={dept.value}>
-                            {dept.value} - {dept.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Municipio</Label>
-                    <Select 
-                      value={formData.municipality} 
-                      onValueChange={(v) => handleChange('municipality', v)}
-                      disabled={!formData.department}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione municipio" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {municipalities.filter(m => m.departmentId === formData.department).map((mun) => (
-                          <SelectItem key={mun.value} value={mun.value}>
-                            {mun.value} - {mun.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Distrito</Label>
-                    <Select 
-                      value={formData.district} 
-                      onValueChange={(v) => handleChange('district', v)}
-                      disabled={!formData.department}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione distrito" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {districts.filter(d => d.departmentId === formData.department).map((dist) => (
-                          <SelectItem key={dist.value} value={dist.value}>
-                            {dist.value} - {dist.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {isAdmin && (
-                    <div className="space-y-2">
-                      <Label>Límite Crédito ($)</Label>
-                      <Input 
-                        type="number"
-                        value={formData.creditLimit} 
-                        onChange={(e) => handleChange('creditLimit', e.target.value)}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Dirección Completa / Complemento</Label>
-                <Textarea 
-                  required={formData.customerType === 'CONTRIBUYENTE'}
-                  value={formData.addressComplement} 
-                  onChange={(e) => handleChange('addressComplement', e.target.value)}
-                  placeholder="Calle, Colonia, Casa #..."
-                  rows={2}
-                />
-              </div>
             </div>
           )}
 
+          {/* Documento de Identidad — solo CONSUMIDOR_FINAL */}
           {formData.customerType === 'CONSUMIDOR_FINAL' && (
             <div className="space-y-4 pt-4 border-t border-dashed">
               <h3 className="text-sm font-bold flex items-center gap-2 opacity-70">
@@ -356,8 +268,8 @@ export function CustomerDialog({ open, onOpenChange, customer, onSuccess }: Cust
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Tipo de Documento</Label>
-                  <Select 
-                    value={formData.documentType} 
+                  <Select
+                    value={formData.documentType}
                     onValueChange={(v) => handleChange('documentType', v)}
                   >
                     <SelectTrigger>
@@ -373,13 +285,108 @@ export function CustomerDialog({ open, onOpenChange, customer, onSuccess }: Cust
                 </div>
                 <div className="space-y-2">
                   <Label>Número Documento</Label>
-                  <Input 
-                    value={formData.documentNumber} 
+                  <Input
+                    value={formData.documentNumber}
                     onChange={(e) => handleChange('documentNumber', e.target.value)}
                     placeholder="00000000-0"
                   />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Dirección — todos los tipos (requerida para DTE) */}
+          <div className="space-y-4 pt-4 border-t border-dashed border-[var(--border)]">
+            <h3 className="text-sm font-bold flex items-center gap-2 opacity-70">
+              <Building2 size={16} />
+              Dirección{formData.customerType === 'CONSUMIDOR_FINAL' ? ' (Opcional para DTE)' : ' (Requerida para DTE)'}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Departamento</Label>
+                <Select
+                  key={`dept-${open}`}
+                  value={formData.department}
+                  onValueChange={(v) => {
+                    handleChange('department', v);
+                    handleChange('municipality', '');
+                    handleChange('district', '');
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione departamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.filter(d => d.value !== "00").map((dept) => (
+                      <SelectItem key={dept.value} value={dept.value}>
+                        {dept.value} - {dept.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Municipio</Label>
+                <Select
+                  key={`mun-${formData.department}-${open}`}
+                  value={formData.municipality}
+                  onValueChange={(v) => handleChange('municipality', v)}
+                  disabled={!formData.department}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione municipio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {municipalities.filter(m => m.departmentId === formData.department).map((mun) => (
+                      <SelectItem key={`mun-${mun.departmentId}-${mun.value}`} value={mun.value}>
+                        {mun.value} - {mun.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Distrito</Label>
+                <Select
+                  key={`dist-${formData.department}-${open}`}
+                  value={formData.district}
+                  onValueChange={(v) => handleChange('district', v)}
+                  disabled={!formData.department}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione distrito" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {districts.filter(d => d.departmentId === formData.department).map((dist) => (
+                      <SelectItem key={`dist-${dist.departmentId}-${dist.value}`} value={dist.value}>
+                        {dist.value} - {dist.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Dirección Completa / Complemento</Label>
+              <Textarea
+                required={formData.customerType !== 'CONSUMIDOR_FINAL'}
+                value={formData.addressComplement}
+                onChange={(e) => handleChange('addressComplement', e.target.value)}
+                placeholder="Calle, Colonia, Casa #..."
+                rows={2}
+              />
+            </div>
+          </div>
+
+          {/* Límite de Crédito — solo CONTRIBUYENTE + admin */}
+          {formData.customerType === 'CONTRIBUYENTE' && isAdmin && (
+            <div className="space-y-2 pt-2">
+              <Label>Límite Crédito ($)</Label>
+              <Input
+                type="number"
+                value={formData.creditLimit}
+                onChange={(e) => handleChange('creditLimit', e.target.value)}
+              />
             </div>
           )}
 

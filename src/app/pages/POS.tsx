@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import logo from "../../assets/logo.png";
 import { useNavigate } from "react-router";
 import {
   Search,
@@ -20,7 +21,9 @@ import {
   Lock,
   Unlock,
   Save,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Upload,
+  ImageIcon,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -29,6 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Calendar } from "../components/ui/calendar";
 import { apiRequest } from "../config/api";
 import { createSale, sendFacturaConsumidor, sendCreditoFiscal } from "../services/sales.service";
+import { createPreSale, PreSaleTicket } from "../services/pre-sales.service";
+import { uploadsService } from "../services/uploads.service";
 import { cashShiftsService, CashShift, BillsBreakdown, CoinsBreakdown, OpenShiftPayload, CloseShiftPayload } from "../services/cash-shifts.service";
 import { quotesService } from "../services/quotes.service";
 import { toast } from "sonner";
@@ -169,6 +174,31 @@ function calcBreakdownTotal(bills: BillsBreakdown, coins: CoinsBreakdown): numbe
 let isCheckoutSubmittingGlobal = false;
 let isQuoteSubmittingGlobal = false;
 
+function _enteroALetras(n: number): string {
+  if (n === 0) return "Cero";
+  const w29 = ["","Uno","Dos","Tres","Cuatro","Cinco","Seis","Siete","Ocho","Nueve",
+    "Diez","Once","Doce","Trece","Catorce","Quince","Dieciséis","Diecisiete","Dieciocho","Diecinueve",
+    "Veinte","Veintiuno","Veintidós","Veintitrés","Veinticuatro","Veinticinco",
+    "Veintiséis","Veintisiete","Veintiocho","Veintinueve"];
+  const dec = ["","","Veinte","Treinta","Cuarenta","Cincuenta","Sesenta","Setenta","Ochenta","Noventa"];
+  const cen = ["","Ciento","Doscientos","Trescientos","Cuatrocientos","Quinientos",
+    "Seiscientos","Setecientos","Ochocientos","Novecientos"];
+  const w1  = ["","Uno","Dos","Tres","Cuatro","Cinco","Seis","Siete","Ocho","Nueve"];
+  if (n <= 29) return w29[n];
+  if (n < 100) return dec[Math.floor(n / 10)] + (n % 10 ? " Y " + w1[n % 10] : "");
+  if (n === 100) return "Cien";
+  if (n < 1000) return cen[Math.floor(n / 100)] + (n % 100 ? " " + _enteroALetras(n % 100) : "");
+  if (n < 2000) return "Mil" + (n % 1000 ? " " + _enteroALetras(n % 1000) : "");
+  if (n < 1_000_000) return _enteroALetras(Math.floor(n / 1000)) + " Mil" + (n % 1000 ? " " + _enteroALetras(n % 1000) : "");
+  return n.toString();
+}
+
+function numerosALetras(n: number): string {
+  const intPart = Math.floor(n);
+  const cents = Math.round((n - intPart) * 100);
+  return `${_enteroALetras(intPart)} dólares${cents > 0 ? ` con ${cents}/100` : ""}`;
+}
+
 export function POS() {
   const navigate = useNavigate();
   const isSubmittingRef = useRef(false);
@@ -209,7 +239,8 @@ export function POS() {
   // New Checkout States
   const [processingOverlay, setProcessingOverlay] = useState(false);
   const [showMixedPaymentModal, setShowMixedPaymentModal] = useState(false);
-  const [payments, setPayments] = useState<{ paymentMethod: 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'CREDITO'; amount: number; reference?: string }[]>([]);
+  const [payments, setPayments] = useState<{ paymentMethod: 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'CREDITO'; amount: number; reference?: string; transferReceiptUrl?: string }[]>([]);
+  const [uploadingReceipt, setUploadingReceipt] = useState<Record<number, boolean>>({});
 
   // Cash Shift States
   const [activeShift, setActiveShift] = useState<CashShift | null>(null);
@@ -237,6 +268,12 @@ export function POS() {
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [quoteValidDays, setQuoteValidDays] = useState<number | "">(15);
   const [checkoutDueDate, setCheckoutDueDate] = useState("");
+
+  // Pre-venta (Ticket) States
+  const [showPreSaleModal, setShowPreSaleModal] = useState(false);
+  const [preSaleDescription, setPreSaleDescription] = useState("");
+  const [preSaleLoading, setPreSaleLoading] = useState(false);
+  const [createdTicket, setCreatedTicket] = useState<PreSaleTicket | null>(null);
 
   // Transport State
   const [transportData, setTransportData] = useState<TransportData | null>(null);
@@ -451,23 +488,23 @@ export function POS() {
           <div class="divider"></div>
           <p><strong>DESGLOSE DE BILLETES</strong></p>
           <table class="table">
-            ${transferBills.d100 > 0 ? `<tr><td>Billetes $100:</td><td>${transferBills.d100}</td><td>$${(transferBills.d100 * 100).toFixed(2)}</td></tr>` : ''}
-            ${transferBills.d50 > 0 ? `<tr><td>Billetes $50:</td><td>${transferBills.d50}</td><td>$${(transferBills.d50 * 50).toFixed(2)}</td></tr>` : ''}
-            ${transferBills.d20 > 0 ? `<tr><td>Billetes $20:</td><td>${transferBills.d20}</td><td>$${(transferBills.d20 * 20).toFixed(2)}</td></tr>` : ''}
-            ${transferBills.d10 > 0 ? `<tr><td>Billetes $10:</td><td>${transferBills.d10}</td><td>$${(transferBills.d10 * 10).toFixed(2)}</td></tr>` : ''}
-            ${transferBills.d5 > 0 ? `<tr><td>Billetes $5:</td><td>${transferBills.d5}</td><td>$${(transferBills.d5 * 5).toFixed(2)}</td></tr>` : ''}
-            ${transferBills.d1 > 0 ? `<tr><td>Billetes $1:</td><td>${transferBills.d1}</td><td>$${(transferBills.d1 * 1).toFixed(2)}</td></tr>` : ''}
+            ${transferBills.d100 > 0 ? `<tr><td>Billetes $100:</td><td>${transferBills.d100}</td><td>$${(transferBills.d100 * 100).toFixed(4)}</td></tr>` : ''}
+            ${transferBills.d50 > 0 ? `<tr><td>Billetes $50:</td><td>${transferBills.d50}</td><td>$${(transferBills.d50 * 50).toFixed(4)}</td></tr>` : ''}
+            ${transferBills.d20 > 0 ? `<tr><td>Billetes $20:</td><td>${transferBills.d20}</td><td>$${(transferBills.d20 * 20).toFixed(4)}</td></tr>` : ''}
+            ${transferBills.d10 > 0 ? `<tr><td>Billetes $10:</td><td>${transferBills.d10}</td><td>$${(transferBills.d10 * 10).toFixed(4)}</td></tr>` : ''}
+            ${transferBills.d5 > 0 ? `<tr><td>Billetes $5:</td><td>${transferBills.d5}</td><td>$${(transferBills.d5 * 5).toFixed(4)}</td></tr>` : ''}
+            ${transferBills.d1 > 0 ? `<tr><td>Billetes $1:</td><td>${transferBills.d1}</td><td>$${(transferBills.d1 * 1).toFixed(4)}</td></tr>` : ''}
           </table>
           <div class="divider"></div>
           <p><strong>DESGLOSE DE MONEDAS</strong></p>
           <table class="table">
-            ${transferCoins.c25 > 0 ? `<tr><td>Monedas $0.25:</td><td>${transferCoins.c25}</td><td>$${(transferCoins.c25 * 0.25).toFixed(2)}</td></tr>` : ''}
-            ${transferCoins.c10 > 0 ? `<tr><td>Monedas $0.10:</td><td>${transferCoins.c10}</td><td>$${(transferCoins.c10 * 0.10).toFixed(2)}</td></tr>` : ''}
-            ${transferCoins.c5 > 0 ? `<tr><td>Monedas $0.05:</td><td>${transferCoins.c5}</td><td>$${(transferCoins.c5 * 0.05).toFixed(2)}</td></tr>` : ''}
-            ${transferCoins.c1 > 0 ? `<tr><td>Monedas $0.01:</td><td>${transferCoins.c1}</td><td>$${(transferCoins.c1 * 0.01).toFixed(2)}</td></tr>` : ''}
+            ${transferCoins.c25 > 0 ? `<tr><td>Monedas $0.25:</td><td>${transferCoins.c25}</td><td>$${(transferCoins.c25 * 0.25).toFixed(4)}</td></tr>` : ''}
+            ${transferCoins.c10 > 0 ? `<tr><td>Monedas $0.10:</td><td>${transferCoins.c10}</td><td>$${(transferCoins.c10 * 0.10).toFixed(4)}</td></tr>` : ''}
+            ${transferCoins.c5 > 0 ? `<tr><td>Monedas $0.05:</td><td>${transferCoins.c5}</td><td>$${(transferCoins.c5 * 0.05).toFixed(4)}</td></tr>` : ''}
+            ${transferCoins.c1 > 0 ? `<tr><td>Monedas $0.01:</td><td>${transferCoins.c1}</td><td>$${(transferCoins.c1 * 0.01).toFixed(4)}</td></tr>` : ''}
           </table>
           <div class="divider"></div>
-          <div class="total">TOTAL: $${total.toFixed(2)}</div>
+          <div class="total">TOTAL: $${total.toFixed(4)}</div>
           <br><br><br>
           <div class="divider"></div>
           <p class="center">Firma Responsable</p>
@@ -919,7 +956,7 @@ export function POS() {
       }
 
       if (sysConfig?.blockOnOverLimit && (balance + total) > limit) {
-        setCheckoutErrorAlert(`CRÉDITO INSUFICIENTE. El cliente superaría su límite de crédito (Límite: $${limit.toFixed(2)}, Saldo: $${balance.toFixed(2)}, Venta: $${total.toFixed(2)})`);
+        setCheckoutErrorAlert(`CRÉDITO INSUFICIENTE. El cliente superaría su límite de crédito (Límite: $${limit.toFixed(4)}, Saldo: $${balance.toFixed(4)}, Venta: $${total.toFixed(4)})`);
         return;
       }
     }
@@ -933,7 +970,7 @@ export function POS() {
     // Validación extra: suma de pagos debe cuadrar con el total
     const sumPayments = payments.reduce((sum, p) => sum + p.amount, 0);
     if (Math.abs(sumPayments - total) > 0.01) {
-      toast.error(`La suma de los pagos ($${sumPayments.toFixed(2)}) no coincide con el total ($${total.toFixed(2)})`);
+      toast.error(`La suma de los pagos ($${sumPayments.toFixed(4)}) no coincide con el total ($${total.toFixed(4)})`);
       return;
     }
 
@@ -988,6 +1025,7 @@ export function POS() {
       setCheckoutDueDate("");
       setTransportData(null);
       setShowMixedPaymentModal(false);
+      setUploadingReceipt({});
 
     } catch (error: any) {
       const msg = error.message || "Error al procesar la venta. Verifique el stock.";
@@ -1010,6 +1048,149 @@ export function POS() {
       setProcessingOverlay(false);
       setLoading(false);
     }
+  };
+
+  const handlePreSale = async () => {
+    if (cart.length === 0) return;
+    setPreSaleLoading(true);
+    try {
+      const ticket = await createPreSale({
+        customerId: selectedCustomer?.id,
+        totalAmount: total,
+        taxAmount: iva,
+        description: preSaleDescription || undefined,
+        items: cart.flatMap((i) =>
+          i.selections.map((s) => ({
+            productId: i.id,
+            quantity: Number(s.quantity),
+            unitPrice: Number(s.price),
+            unitType: s.unitType,
+            unitFactor: Number(s.unitFactor),
+          }))
+        ),
+      });
+      setCreatedTicket(ticket);
+      setCart([]);
+      setSearchTerm("");
+      setSelectedCustomer(null);
+      setPreSaleDescription("");
+      setShowPreSaleModal(false);
+      toast.success(`Ticket ${ticket.ticketNumber} creado — entrégalo en caja`);
+    } catch (error: any) {
+      toast.error(error.message || "Error al crear el ticket");
+    } finally {
+      setPreSaleLoading(false);
+    }
+  };
+
+  const printTicket = (ticket: PreSaleTicket) => {
+    const fmt = (n: number) => `$${n.toFixed(2)}`;
+    const vatRate  = parseFloat(String(sysConfig?.vatRate ?? 0.13));
+    const totalNum = Number(ticket.totalAmount);
+    const taxNum   = Number(ticket.taxAmount);
+    const subtotal = totalNum - taxNum;
+    const createdAt = new Date(ticket.createdAt);
+
+    const companyName     = sysConfig?.companyName     || "AGROFERRETERÍA D'CAMPO";
+    const companyAddress  = sysConfig?.companyAddress  || "";
+    const companyNit      = sysConfig?.companyNit      || "";
+    const companyNrc      = sysConfig?.companyNrc      || "";
+    const companyPhone    = sysConfig?.companyPhone || "";
+    const companyActivity = sysConfig?.companyActivity || "";
+
+    const customerName     = ticket.customer?.name || "CONSUMIDOR FINAL";
+    const customerAddress  = (ticket.customer as any)?.address  || "Ciudad";
+    const customerPhone    = (ticket.customer as any)?.phone    || "";
+    const customerEmail    = (ticket.customer as any)?.email    || "";
+    const customerActivity = (ticket.customer as any)?.activityDescription || "";
+
+    const totalInWords = numerosALetras(totalNum);
+    const dateStr = createdAt.toLocaleDateString("es-SV");
+    const timeStr = createdAt.toLocaleTimeString("es-SV", { hour: "2-digit", minute: "2-digit" });
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Ticket ${ticket.ticketNumber}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Courier New',monospace;font-size:11px;width:80mm;padding:8px;color:#000}
+  h1{font-size:14px;text-align:center;font-weight:bold;margin-bottom:2px}
+  .center{text-align:center} .bold{font-weight:bold}
+  hr{border:none;border-top:1px solid #000;margin:5px 0}
+  hr.d{border-top:1px dashed #000}
+  table{width:100%;border-collapse:collapse;font-size:10px}
+  th{font-weight:bold;text-align:left;padding:1px 2px}
+  td{padding:1px 2px;vertical-align:top}
+  .tr{text-align:right}
+  .row{display:flex;justify-content:space-between;gap:4px;margin:1px 0;font-size:10.5px}
+  .stitle{font-weight:bold;margin:3px 0 1px}
+  .badge{text-align:center;border:2px solid #000;padding:3px 8px;font-weight:bold;font-size:12px;margin:4px 0}
+  @media print{@page{margin:0;size:80mm auto}body{margin:0;padding:4px}}
+</style></head><body>
+
+<div class="center"><img src="${window.location.origin}${logo}" style="width:72px;height:auto;margin-bottom:4px" alt="logo"></div>
+<h1>${companyName}</h1>
+<div class="center" style="font-size:9.5px">${companyAddress}</div>
+<div class="center">NIT: ${companyNit}</div>
+<div class="center">NRC: ${companyNrc}</div>
+<div class="center" style="font-size:10px">Actividad económica: ${companyActivity}</div>
+<div class="center" style="font-size:10px">Tipo de establecimiento: Casa matriz</div>
+${companyPhone ? `<div class="center">Tel: ${companyPhone}</div>` : ""}
+
+<hr>
+
+<div class="badge">PRE-VENTA — PENDIENTE DE COBRO</div>
+<div class="center bold" style="font-size:13px">${ticket.ticketNumber}</div>
+
+<hr>
+
+<div class="stitle">Información</div>
+<div class="row"><span>Fecha y hora:</span><span>${dateStr} ${timeStr}</span></div>
+<div class="row"><span>Atendido por:</span><span>${ticket.user?.fullName || "-"}</span></div>
+
+<hr>
+
+<div class="stitle">Datos del receptor</div>
+<div class="row"><span>Nombre:</span><span>${customerName}</span></div>
+<div class="row"><span>Dirección:</span><span>${customerAddress}</span></div>
+<div class="row"><span>Correo:</span><span>${customerEmail}</span></div>
+<div class="row"><span>Teléfono:</span><span>${customerPhone}</span></div>
+<div class="row"><span>Actividad económica:</span><span>${customerActivity}</span></div>
+<div class="row"><span>Descripción:</span><span>${ticket.description || ""}</span></div>
+
+<hr>
+
+<table>
+  <thead><tr>
+    <th style="width:14px"></th><th>Cant</th><th>Descripción</th><th class="tr">Precio</th><th class="tr">Monto</th>
+  </tr></thead>
+  <tbody>
+    ${ticket.items.map(i => `<tr>
+      <td><span style="display:inline-block;width:11px;height:11px;border:1.5px solid #000;vertical-align:middle"></span></td>
+      <td>${Number(i.quantity)}</td>
+      <td>${i.product?.name || ""}</td>
+      <td class="tr">${fmt(Number(i.unitPrice))}</td>
+      <td class="tr">${fmt(Number(i.totalPrice))}</td>
+    </tr>`).join("")}
+  </tbody>
+</table>
+
+<hr>
+
+<div class="row"><span>Subtotal:</span><span>${fmt(subtotal)}</span></div>
+<div class="row"><span>IVA (${(vatRate * 100).toFixed(0)}%):</span><span>${fmt(taxNum)}</span></div>
+<div class="row bold" style="font-size:13px"><span>Total a pagar:</span><span>${fmt(totalNum)}</span></div>
+<div class="row"><span class="bold">Total en letras:</span><span>${totalInWords}</span></div>
+
+<hr class="d">
+<div class="center bold" style="margin-top:6px;font-size:12px">PRESENTE ESTE TICKET EN CAJA</div>
+<script>window.onload=function(){window.print();setTimeout(function(){window.close()},1500)}</script>
+</body></html>`;
+
+    const win = window.open("", "_blank", "width=520,height=820");
+    if (!win) return;
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
   };
 
   return (
@@ -1102,7 +1283,7 @@ export function POS() {
                   
                   <div className="mt-auto flex items-center justify-between pt-2 border-t border-[var(--border)]">
                     <span className="text-base font-black text-[var(--primary)]">
-                      ${product.price.toFixed(2)} <span className="text-[10px] font-normal text-[var(--text-sec)]">/ {product.unit}</span>
+                      ${product.price.toFixed(4)} <span className="text-[10px] font-normal text-[var(--text-sec)]">/ {product.unit}</span>
                     </span>
                     <div className="size-6 rounded bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center">
                       <Plus size={14} />
@@ -1262,7 +1443,7 @@ export function POS() {
                                 className="w-full h-7 bg-[var(--bg)] border border-[var(--border)] focus:border-[var(--primary)] rounded text-right pr-2 pl-4 font-black text-[var(--primary)] text-sm shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-0"
                               />
                             </div>
-                            <span className="text-[9px] font-bold text-[var(--text-sec)]">Sub: ${(sel.quantity * sel.price).toFixed(2)}</span>
+                            <span className="text-[9px] font-bold text-[var(--text-sec)]">Sub: ${(sel.quantity * sel.price).toFixed(4)}</span>
                           </div>
                           
                           <Button
@@ -1309,11 +1490,11 @@ export function POS() {
             
             <div className="flex items-end justify-between px-1">
               <div className="text-xs font-bold text-[var(--text-sec)] flex flex-col">
-                <span>Sub: ${subtotal.toFixed(2)}</span>
-                <span>IVA: ${iva.toFixed(2)}</span>
+                <span>Sub: ${subtotal.toFixed(4)}</span>
+                <span>IVA: ${iva.toFixed(4)}</span>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-[var(--primary)] leading-none">${total.toFixed(2)}</span>
+                <span className="text-2xl font-black text-[var(--primary)] leading-none">${total.toFixed(4)}</span>
               </div>
             </div>
 
@@ -1369,24 +1550,39 @@ export function POS() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                onClick={() => setShowQuoteModal(true)}
-                disabled={loading || cart.length === 0}
-                variant="outline"
-                className="h-12 rounded-xl font-bold text-sm border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white"
-              >
-                <Save className="mr-2 size-4" /> COTIZAR
-              </Button>
-              <Button
-                ref={checkoutBtnRef}
-                onClick={() => { if (!isCheckoutSubmittingGlobal) handleCheckoutClick(); }}
-                disabled={loading || cart.length === 0}
-                className="h-12 rounded-xl font-black text-sm bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90"
-              >
-                {loading ? <div className="animate-spin size-5 border-2 border-white border-t-transparent rounded-full" /> : <><Printer className="mr-2 size-4" /> COBRAR</>}
-              </Button>
-            </div>
+            <Button
+              onClick={() => { if (cart.length === 0) { toast.error("Agrega productos al carrito"); return; } setShowPreSaleModal(true); }}
+              disabled={loading || cart.length === 0}
+              variant="outline"
+              className="w-full h-10 rounded-xl font-bold text-sm border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white mb-2"
+            >
+              <FileText className="mr-2 size-4" /> PREPARAR TICKET (SIN COBRAR)
+            </Button>
+            {(() => {
+              const canCobrar = user?.role !== 'VENDEDOR';
+              return (
+                <div className={`grid gap-2 ${canCobrar ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  <Button
+                    onClick={() => setShowQuoteModal(true)}
+                    disabled={loading || cart.length === 0}
+                    variant="outline"
+                    className="h-12 rounded-xl font-bold text-sm border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white"
+                  >
+                    <Save className="mr-2 size-4" /> COTIZAR
+                  </Button>
+                  {canCobrar && (
+                    <Button
+                      ref={checkoutBtnRef}
+                      onClick={() => { if (!isCheckoutSubmittingGlobal) handleCheckoutClick(); }}
+                      disabled={loading || cart.length === 0}
+                      className="h-12 rounded-xl font-black text-sm bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90"
+                    >
+                      {loading ? <div className="animate-spin size-5 border-2 border-white border-t-transparent rounded-full" /> : <><Printer className="mr-2 size-4" /> COBRAR</>}
+                    </Button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -1543,7 +1739,7 @@ export function POS() {
               <div className="flex flex-col sm:flex-row justify-center sm:justify-between items-center rounded-xl sm:rounded-2xl border-2 border-[var(--primary)]/20 bg-[var(--primary)]/5 px-4 sm:px-6 py-3 sm:py-0 sm:h-[72px] shadow-inner gap-1 sm:gap-0">
                 <span className="text-[10px] sm:text-sm font-bold text-[var(--primary)] uppercase tracking-widest opacity-80">Total Calculado</span>
                 <span className="text-3xl sm:text-4xl font-black text-[var(--primary)] tracking-tight">
-                  ${calcBreakdownTotal(openBills, openCoins).toFixed(2)}
+                  ${calcBreakdownTotal(openBills, openCoins).toFixed(4)}
                 </span>
               </div>
             </div>
@@ -1595,23 +1791,23 @@ export function POS() {
               <div className="p-4 sm:p-6 rounded-2xl border border-[var(--border)] bg-[var(--card)]/50 space-y-4">
                 <div className="flex justify-between items-center text-base">
                   <span className="text-[var(--text-sec)] font-medium">Fondo Base (Apertura):</span>
-                  <span className="font-bold text-xl text-[var(--text-main)]">${activeShift?.initialAmount ? Number(activeShift.initialAmount).toFixed(2) : "0.00"}</span>
+                  <span className="font-bold text-xl text-[var(--text-main)]">${activeShift?.initialAmount ? Number(activeShift.initialAmount).toFixed(4) : "0.00"}</span>
                 </div>
                 {canCloseDirectly && (
                   <div className="flex justify-between items-center text-base">
                     <span className="text-[var(--text-sec)] font-medium">Monto Esperado (Base + Ventas):</span>
-                    <span className="font-bold text-xl text-[var(--text-main)]">${closeSummary.expectedAmount.toFixed(2)}</span>
+                    <span className="font-bold text-xl text-[var(--text-main)]">${closeSummary.expectedAmount.toFixed(4)}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center text-base">
                   <span className="text-[var(--text-sec)] font-medium">Monto Contado (Real):</span>
-                  <span className="font-bold text-xl text-[var(--text-main)]">${closeSummary.countedCash.toFixed(2)}</span>
+                  <span className="font-bold text-xl text-[var(--text-main)]">${closeSummary.countedCash.toFixed(4)}</span>
                 </div>
                 {canCloseDirectly && (
                   <div className="pt-4 border-t border-[var(--border)] flex justify-between items-center">
                     <span className="font-bold text-lg text-[var(--text-main)]">Diferencia:</span>
                     <span className={cn("font-black text-3xl", closeSummary.difference < 0 ? "text-red-500" : "text-emerald-500")}>
-                      {closeSummary.difference > 0 ? "+" : ""}${closeSummary.difference.toFixed(2)}
+                      {closeSummary.difference > 0 ? "+" : ""}${closeSummary.difference.toFixed(4)}
                     </span>
                   </div>
                 )}
@@ -1638,19 +1834,19 @@ export function POS() {
                 <div className="bg-blue-500/5 p-4 sm:p-5 rounded-2xl border border-blue-500/20 grid grid-cols-1 sm:grid-cols-4 gap-4 sm:gap-6 shadow-sm text-center">
                   <div className="flex flex-col items-center bg-[var(--bg)]/50 sm:bg-transparent p-2 sm:p-0 rounded-lg sm:rounded-none">
                     <span className="text-[10px] sm:text-xs text-blue-500 font-bold uppercase tracking-widest mb-1.5 opacity-80">Fondo Base</span>
-                    <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400">${activeShift?.initialAmount ? Number(activeShift.initialAmount).toFixed(2) : "0.00"}</span>
+                    <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400">${activeShift?.initialAmount ? Number(activeShift.initialAmount).toFixed(4) : "0.00"}</span>
                   </div>
                   <div className="flex flex-col items-center bg-[var(--bg)]/50 sm:bg-transparent p-2 sm:p-0 rounded-lg sm:rounded-none">
                     <span className="text-[10px] sm:text-xs text-blue-500 font-bold uppercase tracking-widest mb-1.5 opacity-80">Efectivo Esperado</span>
-                    <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400">${closeExpectedTotals.expectedAmount.toFixed(2)}</span>
+                    <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400">${closeExpectedTotals.expectedAmount.toFixed(4)}</span>
                   </div>
                   <div className="flex flex-col items-center bg-[var(--bg)]/50 sm:bg-transparent p-2 sm:p-0 rounded-lg sm:rounded-none">
                     <span className="text-[10px] sm:text-xs text-blue-500 font-bold uppercase tracking-widest mb-1.5 opacity-80">Tarjeta</span>
-                    <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400">${closeExpectedTotals.expectedTarjeta.toFixed(2)}</span>
+                    <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400">${closeExpectedTotals.expectedTarjeta.toFixed(4)}</span>
                   </div>
                   <div className="flex flex-col items-center bg-[var(--bg)]/50 sm:bg-transparent p-2 sm:p-0 rounded-lg sm:rounded-none">
                     <span className="text-[10px] sm:text-xs text-blue-500 font-bold uppercase tracking-widest mb-1.5 opacity-80">Transferencia</span>
-                    <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400">${closeExpectedTotals.expectedTransferencia.toFixed(2)}</span>
+                    <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400">${closeExpectedTotals.expectedTransferencia.toFixed(4)}</span>
                   </div>
                 </div>
               )}
@@ -1741,7 +1937,7 @@ export function POS() {
                 <div className="flex flex-col sm:flex-row justify-center sm:justify-between items-center rounded-xl sm:rounded-2xl border-2 border-rose-500/20 bg-rose-500/5 px-4 sm:px-6 py-3 sm:py-0 sm:h-[72px] shadow-inner gap-1 sm:gap-0">
                   <span className="text-[10px] sm:text-sm font-bold text-rose-500 uppercase tracking-widest opacity-80">Total Contado</span>
                   <span className="text-3xl sm:text-4xl font-black text-rose-500 tracking-tight">
-                    ${calcBreakdownTotal(closeBills, closeCoins).toFixed(2)}
+                    ${calcBreakdownTotal(closeBills, closeCoins).toFixed(4)}
                   </span>
                 </div>
               </div>
@@ -1836,7 +2032,7 @@ export function POS() {
             <div className="flex justify-between items-center rounded-xl border-2 border-emerald-500/20 bg-emerald-50 px-6 h-[72px] shadow-inner mt-4">
               <span className="text-sm font-bold text-emerald-600 uppercase tracking-widest">Total a Transferir</span>
               <span className="text-4xl font-black text-emerald-600 tracking-tight">
-                ${calcBreakdownTotal(transferBills, transferCoins).toFixed(2)}
+                ${calcBreakdownTotal(transferBills, transferCoins).toFixed(4)}
               </span>
             </div>
           </div>
@@ -1942,7 +2138,7 @@ export function POS() {
           <div className="py-4 space-y-4">
             <div className="flex justify-between items-center p-4 bg-[var(--card)] border border-[var(--border)] rounded-xl">
               <span className="text-lg font-bold text-[var(--text-sec)]">Total a Cobrar</span>
-              <span className="text-3xl font-black text-[var(--text-main)]">${total.toFixed(2)}</span>
+              <span className="text-3xl font-black text-[var(--text-main)]">${total.toFixed(4)}</span>
             </div>
 
             <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
@@ -2021,6 +2217,57 @@ export function POS() {
                       className="h-8 text-xs bg-[var(--card)]"
                     />
                   )}
+                  {payment.paymentMethod === 'TRANSFERENCIA' && (
+                    <div className="flex flex-col gap-1.5">
+                      <label
+                        htmlFor={`transfer-receipt-${index}`}
+                        className={cn(
+                          "flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-2 text-xs transition-colors",
+                          uploadingReceipt[index]
+                            ? "border-[var(--primary)]/50 bg-[var(--primary)]/5 text-[var(--primary)]"
+                            : payment.transferReceiptUrl
+                            ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                            : "border-[var(--border)] bg-[var(--card)] text-[var(--text-sec)] hover:border-[var(--primary)]/50 hover:text-[var(--primary)]"
+                        )}
+                      >
+                        {uploadingReceipt[index] ? (
+                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent" />
+                        ) : payment.transferReceiptUrl ? (
+                          <ImageIcon size={14} className="shrink-0" />
+                        ) : (
+                          <Upload size={14} className="shrink-0" />
+                        )}
+                        <span className="truncate">
+                          {uploadingReceipt[index]
+                            ? "Subiendo comprobante..."
+                            : payment.transferReceiptUrl
+                            ? "Comprobante subido — clic para cambiar"
+                            : "Subir foto del comprobante (Opcional)"}
+                        </span>
+                        <input
+                          id={`transfer-receipt-${index}`}
+                          type="file"
+                          accept="image/jpg,image/jpeg,image/png,application/pdf"
+                          className="sr-only"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setUploadingReceipt(prev => ({ ...prev, [index]: true }));
+                            try {
+                              const { url } = await uploadsService.uploadReceipt(file);
+                              const newPayments = [...payments];
+                              newPayments[index].transferReceiptUrl = url;
+                              setPayments(newPayments);
+                            } catch {
+                              toast.error("Error al subir el comprobante de transferencia");
+                            } finally {
+                              setUploadingReceipt(prev => ({ ...prev, [index]: false }));
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2042,7 +2289,7 @@ export function POS() {
             <div className="flex-1 flex justify-between items-center w-full">
               <span className="text-sm font-bold text-[var(--text-sec)]">Resta:</span>
               <span className={cn("text-lg font-black", (total - payments.reduce((sum, p) => sum + p.amount, 0)) === 0 ? "text-emerald-500" : "text-rose-500")}>
-                ${(total - payments.reduce((sum, p) => sum + p.amount, 0)).toFixed(2)}
+                ${(total - payments.reduce((sum, p) => sum + p.amount, 0)).toFixed(4)}
               </span>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
@@ -2059,6 +2306,99 @@ export function POS() {
                 {loading ? <RefreshCcw className="animate-spin size-4 mr-2" /> : "Confirmar Venta"}
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Modal: Confirmar Pre-Venta (Ticket) */}
+      <Dialog open={showPreSaleModal} onOpenChange={setShowPreSaleModal}>
+        <DialogContent className="sm:max-w-md p-0">
+          <div className="p-5 border-b border-[var(--border)]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg font-black text-amber-600">
+                <FileText size={20} /> Preparar Ticket de Pre-Venta
+              </DialogTitle>
+              <DialogDescription className="text-sm text-[var(--text-sec)]">
+                El ticket se entrega en caja. La cajera cobra y confirma el pago.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="bg-[var(--bg)] rounded-xl border border-[var(--border)] p-3 space-y-1 max-h-40 overflow-y-auto">
+              {cart.map((item) =>
+                item.selections.map((s) => (
+                  <div key={s.id} className="flex justify-between text-sm">
+                    <span className="text-[var(--text-main)] font-medium">{item.name} <span className="text-[var(--text-sec)]">x{s.quantity}</span></span>
+                    <span className="font-bold">${(s.quantity * s.price).toFixed(2)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="flex justify-between font-black text-base border-t border-[var(--border)] pt-3">
+              <span>TOTAL:</span><span>${total.toFixed(2)}</span>
+            </div>
+            {selectedCustomer && (
+              <div className="text-sm text-[var(--text-sec)]">
+                <span className="font-bold">Cliente:</span> {selectedCustomer.name}
+              </div>
+            )}
+            <div>
+              <label className="text-xs font-bold text-[var(--text-sec)] uppercase block mb-1">Descripción / Nota (opcional)</label>
+              <textarea
+                value={preSaleDescription}
+                onChange={(e) => setPreSaleDescription(e.target.value)}
+                placeholder="Ej: Entregar en bodega, urgente, pedido especial..."
+                rows={2}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
+          </div>
+          <DialogFooter className="p-5 border-t border-[var(--border)] flex gap-2">
+            <Button variant="ghost" onClick={() => setShowPreSaleModal(false)} className="flex-1">
+              Cancelar
+            </Button>
+            <Button
+              onClick={handlePreSale}
+              disabled={preSaleLoading || cart.length === 0}
+              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-black"
+            >
+              {preSaleLoading
+                ? <div className="animate-spin size-4 border-2 border-white border-t-transparent rounded-full" />
+                : <><FileText className="mr-2 size-4" /> Generar Ticket</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Ticket Creado — opción de imprimir */}
+      <Dialog open={!!createdTicket} onOpenChange={(open) => { if (!open) setCreatedTicket(null); }}>
+        <DialogContent className="sm:max-w-sm p-0">
+          <div className="p-5 text-center space-y-3">
+            <div className="mx-auto w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center">
+              <CheckCircle2 size={32} className="text-amber-600" />
+            </div>
+            <h2 className="text-xl font-black text-[var(--text-main)]">Ticket Generado</h2>
+            <p className="text-3xl font-black text-amber-600">{createdTicket?.ticketNumber}</p>
+            <p className="text-sm text-[var(--text-sec)]">Entrega este ticket al cliente para que lo presente en caja.</p>
+            <div className="bg-[var(--bg)] rounded-xl border border-[var(--border)] p-3 text-left space-y-1">
+              {createdTicket?.items?.map((item: any) => (
+                <div key={item.id} className="flex justify-between text-sm">
+                  <span>{item.product?.name} x{Number(item.quantity)}</span>
+                  <span className="font-bold">${Number(item.totalPrice).toFixed(2)}</span>
+                </div>
+              ))}
+              <div className="border-t border-[var(--border)] pt-2 flex justify-between font-black">
+                <span>Total</span><span>${Number(createdTicket?.totalAmount).toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="p-4 border-t border-[var(--border)] flex gap-2">
+            <Button variant="ghost" onClick={() => setCreatedTicket(null)} className="flex-1">Cerrar</Button>
+            <Button
+              onClick={() => { if (createdTicket) printTicket(createdTicket); }}
+              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-black"
+            >
+              <Printer className="mr-2 size-4" /> Imprimir Ticket
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

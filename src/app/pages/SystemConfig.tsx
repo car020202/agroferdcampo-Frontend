@@ -11,6 +11,13 @@ import { useNavigate } from "react-router";
 
 export interface SystemConfigData {
   id: number;
+  companyName?: string;
+  companyNit?: string;
+  companyNrc?: string;
+  companyAddress?: string;
+  companyPhone?: string;
+  companyEmail?: string;
+  companyActivity?: string;
   currency: string;
   vatRate: number;
   vatIncluded: boolean;

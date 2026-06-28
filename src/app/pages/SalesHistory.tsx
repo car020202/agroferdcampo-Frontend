@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import {
   Search,
@@ -1144,7 +1144,7 @@ export function SalesHistory() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-black text-[var(--text-main)]">
-                          ${Number(sale.totalAmount).toFixed(2)}
+                          ${Number(sale.totalAmount).toFixed(4)}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge
@@ -1194,12 +1194,16 @@ export function SalesHistory() {
                                 Ver Detalle
                               </DropdownMenuItem>
 
-                              {!sale.dteResponse &&
-                                sale.status === "COMPLETADA" && (
+                              {sale.status === "COMPLETADA" &&
+                                sale.dteResponse?.estado !== "PROCESADO" && (
                                   <DropdownMenuItem
                                     onClick={() => handleEmitDte(sale)}
                                     disabled={emittingDteId === sale.id}
-                                    className="font-bold cursor-pointer text-emerald-600 focus:text-emerald-700"
+                                    className={`font-bold cursor-pointer focus:text-emerald-700 ${
+                                      sale.dteResponse
+                                        ? "text-amber-600"
+                                        : "text-emerald-600"
+                                    }`}
                                   >
                                     {emittingDteId === sale.id ? (
                                       <RefreshCcw
@@ -1209,7 +1213,9 @@ export function SalesHistory() {
                                     ) : (
                                       <Send size={14} className="mr-2" />
                                     )}
-                                    Emitir DTE a Hacienda
+                                    {sale.dteResponse
+                                      ? "Reenviar DTE a Hacienda"
+                                      : "Emitir DTE a Hacienda"}
                                   </DropdownMenuItem>
                                 )}
 
@@ -1507,7 +1513,7 @@ export function SalesHistory() {
                           {getReasonBadge(ret.reason)}
                         </TableCell>
                         <TableCell className="text-right font-black text-emerald-600">
-                          ${Number(ret.totalRefund).toFixed(2)}
+                          ${Number(ret.totalRefund).toFixed(4)}
                         </TableCell>
                         <TableCell className="text-center">
                           {getReturnStatusBadge(ret.status)}
@@ -1830,10 +1836,10 @@ export function SalesHistory() {
                                   </p>
                                 </TableCell>
                                 <TableCell className="text-right text-[var(--text-sec)] font-medium">
-                                  ${Number(item.unitPrice).toFixed(2)}
+                                  ${Number(item.unitPrice).toFixed(4)}
                                 </TableCell>
                                 <TableCell className="text-right font-black text-amber-500">
-                                  ${Number(item.totalPrice).toFixed(2)}
+                                  ${Number(item.totalPrice).toFixed(4)}
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -1845,7 +1851,7 @@ export function SalesHistory() {
                               Total a Pagar
                             </p>
                             <p className="text-xl font-black text-amber-500">
-                              ${Number(selectedSale.totalAmount).toFixed(2)}
+                              ${Number(selectedSale.totalAmount).toFixed(4)}
                             </p>
                           </div>
                         </div>
@@ -2162,7 +2168,7 @@ export function SalesHistory() {
                       {item.quantity}
                     </TableCell>
                     <TableCell className="text-right">
-                      ${Number(item.unitPrice).toFixed(2)}
+                      ${Number(item.unitPrice).toFixed(4)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Input
@@ -2377,7 +2383,7 @@ export function SalesHistory() {
                       Monto Total
                     </span>
                     <span className="font-bold text-amber-500 text-sm">
-                      ${Number(activeSale.totalAmount).toFixed(2)}
+                      ${Number(activeSale.totalAmount).toFixed(4)}
                     </span>
                   </div>
                 </div>
@@ -2423,7 +2429,7 @@ export function SalesHistory() {
                                 {qtyDevuelta}
                               </TableCell>
                               <TableCell className="text-right text-sm font-bold text-[var(--text-main)]">
-                                ${Number(item.unitPrice).toFixed(2)}
+                                ${Number(item.unitPrice).toFixed(4)}
                               </TableCell>
                               <TableCell className="text-center">
                                 <div className="flex items-center justify-center gap-2">
@@ -2676,10 +2682,10 @@ export function SalesHistory() {
                             {item.quantity}
                           </TableCell>
                           <TableCell className="text-right text-sm font-semibold text-[var(--text-main)]">
-                            ${Number(item.unitPrice).toFixed(2)}
+                            ${Number(item.unitPrice).toFixed(4)}
                           </TableCell>
                           <TableCell className="text-right text-sm font-black text-emerald-600">
-                            ${Number(item.subtotal).toFixed(2)}
+                            ${Number(item.subtotal).toFixed(4)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -2691,7 +2697,7 @@ export function SalesHistory() {
                         Total Reintegro
                       </span>
                       <span className="text-xl font-black text-emerald-600">
-                        ${Number(selectedReturn.totalRefund).toFixed(2)}
+                        ${Number(selectedReturn.totalRefund).toFixed(4)}
                       </span>
                     </div>
                   </div>

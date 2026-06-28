@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   MapPin, Plus, Search, Filter, Truck, User, Play, CheckCircle2, XCircle, Printer, Eye, Trash2, PackageCheck, CalendarIcon
 } from 'lucide-react';
@@ -889,12 +889,12 @@ export default function DeliveryRoutes({ hideTitle }: { hideTitle?: boolean } = 
                                   <TableCell className="py-2 text-sm text-center font-bold">{Number(item.quantity)}</TableCell>
                                   {isSale && (
                                     <TableCell className="py-2 text-sm text-right text-[var(--text-sec)]">
-                                      ${Number(item.unitPrice).toFixed(2)}
+                                      ${Number(item.unitPrice).toFixed(4)}
                                     </TableCell>
                                   )}
                                   {isSale && (
                                     <TableCell className="py-2 text-sm text-right font-bold text-[var(--text-main)]">
-                                      ${Number(item.totalPrice).toFixed(2)}
+                                      ${Number(item.totalPrice).toFixed(4)}
                                     </TableCell>
                                   )}
                                 </TableRow>

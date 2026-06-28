@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   Search, FileText, Eye, CheckCircle2, AlertCircle, Calendar as CalendarIcon, RefreshCcw, Filter, X,
   Mail, UserCog, Clock, Send, Plus, Banknote, CreditCard, Smartphone, Trash2, Truck as TruckIcon
@@ -403,7 +403,7 @@ export function Quotes() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-black text-[var(--text-main)]">
-                      ${Number(quote.totalAmount).toFixed(2)}
+                      ${Number(quote.totalAmount).toFixed(4)}
                     </TableCell>
                     <TableCell className="text-center">
                       {getStatusBadge(quote)}
@@ -587,8 +587,8 @@ export function Quotes() {
                         <TableRow key={item.id}>
                           <TableCell className="font-bold">{item.quantity}</TableCell>
                           <TableCell>{item.product?.name}</TableCell>
-                          <TableCell className="text-right">${Number(item.unitPrice).toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-black text-[var(--primary)]">${Number(item.totalPrice).toFixed(2)}</TableCell>
+                          <TableCell className="text-right">${Number(item.unitPrice).toFixed(4)}</TableCell>
+                          <TableCell className="text-right font-black text-[var(--primary)]">${Number(item.totalPrice).toFixed(4)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -607,13 +607,13 @@ export function Quotes() {
                           <div className="flex gap-4 text-xs font-bold bg-[var(--card)] border border-[var(--border)] p-3 rounded-xl shadow-sm">
                             <div className="flex flex-col">
                               <span className="uppercase text-[10px] tracking-wider mb-1">Costo Total</span>
-                              <span className="text-[var(--text-main)]">${totalCost.toFixed(2)}</span>
+                              <span className="text-[var(--text-main)]">${totalCost.toFixed(4)}</span>
                             </div>
                             <div className="w-px bg-[var(--border)]"></div>
                             <div className="flex flex-col">
                               <span className="uppercase text-[10px] tracking-wider mb-1 text-emerald-600">Ganancia Estimada</span>
                               <div className="flex items-center gap-2">
-                                <span className="text-emerald-600">${estimatedGain.toFixed(2)}</span>
+                                <span className="text-emerald-600">${estimatedGain.toFixed(4)}</span>
                                 <span className={cn("text-[10px] font-mono px-1.5 py-0.5 rounded-md border", gainPercent < 5 ? "text-rose-500 border-rose-500/30 bg-rose-500/10" : "text-emerald-600 border-emerald-500/30 bg-emerald-500/10")}>
                                   {gainPercent.toFixed(1)}%
                                 </span>
@@ -625,7 +625,7 @@ export function Quotes() {
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-bold text-[var(--text-sec)] uppercase tracking-wider mb-1">Total Cotización</p>
-                      <p className="text-3xl font-black text-[var(--primary)]">${Number(selectedQuote.totalAmount).toFixed(2)}</p>
+                      <p className="text-3xl font-black text-[var(--primary)]">${Number(selectedQuote.totalAmount).toFixed(4)}</p>
                     </div>
                   </div>
                 </div>
@@ -881,7 +881,7 @@ export function Quotes() {
             {quoteToConfirm && (
               <div className="mt-6 p-4 rounded-lg bg-[var(--bg)]/50 border border-[var(--border)] flex justify-between items-center">
                 <span className="text-sm text-[var(--text-sec)] font-medium">Total a cobrar:</span>
-                <span className="text-xl font-black text-[var(--text-main)]">${Number(quoteToConfirm.totalAmount).toFixed(2)}</span>
+                <span className="text-xl font-black text-[var(--text-main)]">${Number(quoteToConfirm.totalAmount).toFixed(4)}</span>
               </div>
             )}
 
@@ -1100,7 +1100,7 @@ export function Quotes() {
                               </div>
                             </div>
                             <span className="text-[var(--primary)] font-black text-sm">
-                              ${Number(price).toFixed(2)}
+                              ${Number(price).toFixed(4)}
                             </span>
                           </CommandItem>
                         );
@@ -1158,7 +1158,7 @@ export function Quotes() {
                           />
                         </TableCell>
                         <TableCell className="text-right font-bold text-[var(--primary)]">
-                          ${(item.quantity * item.unitPrice).toFixed(2)}
+                          ${(item.quantity * item.unitPrice).toFixed(4)}
                         </TableCell>
                         <TableCell>
                           <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => {
@@ -1175,7 +1175,7 @@ export function Quotes() {
                   <div className="text-right">
                     <p className="text-sm text-[var(--text-sec)]">Total Cotización</p>
                     <p className="text-2xl font-black text-[var(--primary)]">
-                      ${newQuote.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0).toFixed(2)}
+                      ${newQuote.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0).toFixed(4)}
                     </p>
                   </div>
                 </div>
